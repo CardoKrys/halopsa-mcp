@@ -1,0 +1,17 @@
+[workspace]
+members = [
+    "crates/hmcp-common",
+    "crates/hmcp-db-sqlite",
+    "crates/hmcp-server",
+    "crates/hmcp-embedder",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+[profile.release]
+lto = true
+strip = true
+opt-level = "z"

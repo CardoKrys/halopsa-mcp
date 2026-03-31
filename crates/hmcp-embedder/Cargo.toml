@@ -1,0 +1,20 @@
+[package]
+name = "hmcp-embedder"
+edition.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "hmcp-embedder"
+path = "src/main.rs"
+
+[dependencies]
+hmcp-common = { path = "../hmcp-common" }
+hmcp-db-sqlite = { path = "../hmcp-db-sqlite" }
+async-trait = "0.1"
+axum = "0.8"
+fastembed = "5"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }

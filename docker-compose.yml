@@ -1,0 +1,31 @@
+services:
+  hmcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    ports:
+      - "8080:8080"
+    env_file: .env
+    volumes:
+      - hmcp-data:/data
+    depends_on:
+      - hmcp-embedder
+    restart: unless-stopped
+
+  hmcp-embedder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: embedder
+    env_file: .env
+    volumes:
+      - hmcp-data:/data
+      - hmcp-models:/models
+    environment:
+      - HMCP_EMBED_CACHE_DIR=/models
+    restart: unless-stopped
+
+volumes:
+  hmcp-data:
+  hmcp-models:
