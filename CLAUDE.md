@@ -9,7 +9,7 @@ Cargo workspace with 4 crates:
 | Crate | Type | Purpose |
 |-------|------|---------|
 | `hmcp-common` | library | Shared types, HaloPSA API client, DB traits, ticket chunking |
-| `hmcp-db-sqlite` | library | SQLite backend (auth tokens + semantic embeddings) |
+| `hmcp-db-postgres` | library | Postgres + pgvector backend (auth tokens + semantic embeddings) |
 | `hmcp-server` | binary | MCP server (SSE + Streamable HTTP transport, OAuth 2.1 relay, tools) |
 | `hmcp-embedder` | binary | Embedding sidecar (fastembed/OpenAI/Ollama, job queue worker) |
 

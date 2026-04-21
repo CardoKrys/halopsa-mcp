@@ -3,7 +3,6 @@ mod pipeline;
 
 use std::env;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::State;
@@ -13,6 +12,7 @@ use serde::Deserialize;
 use serde_json::json;
 
 use hmcp_common::db::SemanticDb;
+use hmcp_db_postgres::PostgresDb;
 
 #[derive(Clone)]
 struct AppState {
@@ -57,23 +57,29 @@ async fn main() {
         }
     };
 
-    // Database for job queue
-    let encryption_key = env::var("HMCP_ENCRYPTION_KEY").unwrap_or_else(|_| {
-        "embedder-only-key-not-used-for-tokens".to_string()
-    });
-    let db: Option<Arc<dyn SemanticDb>> = {
-        let db_path = env::var("HMCP_DB_PATH")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/data/halopsa-mcp.db"));
-        if db_path.exists() || db_path.parent().map_or(false, |p| p.exists()) {
-            let db = Arc::new(hmcp_db_sqlite::SqliteDb::open(&db_path, &encryption_key));
-            if let Err(e) = db.init_semantic_tables().await {
-                eprintln!("Failed to init semantic tables: {e}");
-                None
-            } else {
-                Some(db as Arc<dyn SemanticDb>)
+    // Database for job queue. The embedder never decrypts user tokens, but it
+    // shares the PostgresDb struct which holds an encryption key field, so we
+    // supply a throwaway key here.
+    let encryption_key = env::var("HMCP_ENCRYPTION_KEY")
+        .unwrap_or_else(|_| "embedder-only-key-not-used-for-tokens".to_string());
+    let db: Option<Arc<dyn SemanticDb>> = match env::var("HMCP_DATABASE_URL") {
+        Ok(url) => match PostgresDb::connect(&url, &encryption_key).await {
+            Ok(pg) => {
+                let pg = Arc::new(pg);
+                if let Err(e) = pg.init_semantic_tables().await {
+                    eprintln!("Failed to init semantic tables: {e}");
+                    None
+                } else {
+                    Some(pg as Arc<dyn SemanticDb>)
+                }
             }
-        } else {
+            Err(e) => {
+                eprintln!("Failed to connect to Postgres: {e}");
+                None
+            }
+        },
+        Err(_) => {
+            eprintln!("HMCP_DATABASE_URL not set; running without DB (embed endpoint only)");
             None
         }
     };

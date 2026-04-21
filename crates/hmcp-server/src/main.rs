@@ -6,7 +6,6 @@ mod tools;
 
 use std::env;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::DefaultBodyLimit;
@@ -17,6 +16,7 @@ use serde_json::json;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 
 use hmcp_common::db::{DbBackend, SemanticDb};
+use hmcp_db_postgres::PostgresDb;
 
 #[tokio::main]
 async fn main() {
@@ -42,28 +42,19 @@ async fn main() {
     }
     eprintln!("Encryption: enabled (AES-256-GCM)");
 
-    // Database
-    let db: Arc<dyn DbBackend> = {
-        let db_path = env::var("HMCP_DB_PATH")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/data/halopsa-mcp.db"));
-        if let Some(parent) = db_path.parent() {
-            std::fs::create_dir_all(parent).ok();
-        }
-        eprintln!("Database: SQLite ({})", db_path.display());
-        Arc::new(hmcp_db_sqlite::SqliteDb::open(&db_path, &encryption_key))
-    };
+    // Database — Postgres with pgvector. One pool shared between the DbBackend
+    // (auth tokens) and SemanticDb (embedding index) trait objects.
+    let database_url = env::var("HMCP_DATABASE_URL")
+        .expect("HMCP_DATABASE_URL is required (postgres://user:pass@host:port/dbname)");
+    let pg = Arc::new(
+        PostgresDb::connect(&database_url, &encryption_key)
+            .await
+            .expect("Failed to connect to Postgres"),
+    );
+    eprintln!("Database: Postgres");
 
-    // Semantic DB (same SQLite instance)
-    let semantic_db: Option<Arc<dyn SemanticDb>> = {
-        let db_path = env::var("HMCP_DB_PATH")
-            .map(PathBuf::from)
-            .unwrap_or_else(|_| PathBuf::from("/data/halopsa-mcp.db"));
-        Some(Arc::new(hmcp_db_sqlite::SqliteDb::open(
-            &db_path,
-            &encryption_key,
-        )))
-    };
+    let db: Arc<dyn DbBackend> = pg.clone();
+    let semantic_db: Option<Arc<dyn SemanticDb>> = Some(pg.clone());
 
     // Known URLs
     let known_urls = {

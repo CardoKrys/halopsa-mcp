@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "crates/hmcp-common",
-    "crates/hmcp-db-sqlite",
+    "crates/hmcp-db-postgres",
     "crates/hmcp-server",
     "crates/hmcp-embedder",
 ]

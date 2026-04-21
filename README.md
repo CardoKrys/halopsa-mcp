@@ -22,11 +22,13 @@ Cargo workspace with four crates:
 | Crate | Type | Purpose |
 |-------|------|---------|
 | `hmcp-common` | library | Shared types, HaloPSA API client, DB traits, ticket chunking |
-| `hmcp-db-sqlite` | library | SQLite backend for auth tokens and semantic embeddings |
+| `hmcp-db-postgres` | library | Postgres + pgvector backend for auth tokens and semantic embeddings |
 | `hmcp-server` | binary | MCP server: OAuth 2.1 relay, SSE + Streamable HTTP transport, tool handlers |
 | `hmcp-embedder` | binary | Embedding sidecar: fastembed/OpenAI/Ollama, job queue worker |
 
 The embedder runs as a separate service. It indexes tickets using a service account (Client Credentials flow) so the embedding corpus is complete. At query time, each result is verified against the requesting user's token before being returned, so users only see tickets they have access to.
+
+Semantic search uses [pgvector](https://github.com/pgvector/pgvector) with an HNSW cosine-similarity index. The Docker Compose file pins `pgvector/pgvector:pg16`, which bundles Postgres 16 and the extension — no extra setup required.
 
 ## Quick Start (Docker)
 
@@ -69,8 +71,7 @@ Server defaults:
 |----------|---------|-------------|
 | `HMCP_HOST` | `0.0.0.0` | Bind address |
 | `HMCP_PORT` | `8080` | Listen port |
-| `HMCP_DB_BACKEND` | `sqlite` | Storage backend (`sqlite` or `postgres`) |
-| `HMCP_DB_PATH` | `/data/halopsa-mcp.db` | SQLite database path |
+| `HMCP_DATABASE_URL` | _(required)_ | Postgres connection URL. In Compose this is derived from `HMCP_DB_USER`/`HMCP_DB_PASSWORD`/`HMCP_DB_NAME` automatically. |
 
 Semantic search (optional):
 
@@ -167,7 +168,7 @@ The server supports both hosted HaloPSA (where a tenant identifier is required) 
 Requires Rust 1.82 or later.
 
 ```bash
-git clone https://github.com/Gumbees/halopsa-mcp
+git clone https://github.com/bees-roadhouse/halopsa-mcp
 cd halopsa-mcp
 cargo build --release
 ```
@@ -188,7 +189,7 @@ docker build --target embedder -t halopsa-mcp-embedder .
 
 ## Status
 
-Phase 1 is complete: tickets, actions, workflow transitions, and semantic search. Planned for future phases: assets, clients, contracts, and invoices.
+Early development. The scaffolding for Phase 1 is in place (ticket, action, workflow, and semantic tools stubbed; OAuth relay and SSE/Streamable HTTP transports wired up) but the server has not yet been run end-to-end against a live HaloPSA instance. Planned for later phases: assets, clients, contracts, and invoices.
 
 ## License
 

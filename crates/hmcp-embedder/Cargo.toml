@@ -9,7 +9,7 @@ path = "src/main.rs"
 
 [dependencies]
 hmcp-common = { path = "../hmcp-common" }
-hmcp-db-sqlite = { path = "../hmcp-db-sqlite" }
+hmcp-db-postgres = { path = "../hmcp-db-postgres" }
 async-trait = "0.1"
 axum = "0.8"
 fastembed = "5"
