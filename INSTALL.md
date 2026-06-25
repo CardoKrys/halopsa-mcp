@@ -12,6 +12,7 @@ This guide covers deploying the HaloPSA MCP server on an Azure Ubuntu VM with HT
 - Public IP with a DNS label assigned (e.g. `your-label.westeurope.cloudapp.azure.com`)
 - Ports 80 and 443 open in the Network Security Group
 - SSH access to the VM
+- System-assigned managed identity on the VM with **Key Vault Secrets User** role on the `HaloSecrets` vault
 - A HaloPSA instance with API access
 - A Claude.ai account with custom connector support
 
@@ -35,9 +36,35 @@ Add two inbound rules to your NSG:
 | Allow-HTTP | 80 | TCP | Allow | 310 |
 | Allow-HTTPS | 443 | TCP | Allow | 320 |
 
+### Managed Identity
+
+1. Go to your VM in the Azure portal
+2. Under **Security** → **Identity**, enable **System assigned** managed identity
+3. Save, then go to the `HaloSecrets` Key Vault
+4. Under **Access control (IAM)**, add a role assignment:
+   - Role: **Key Vault Secrets User**
+   - Member: your VM's managed identity
+
 ---
 
-## 2. Install Docker
+## 2. Key Vault Secrets
+
+Ask your Key Vault administrator to create the following secrets in the `HaloSecrets` vault:
+
+| Secret name | Value |
+|-------------|-------|
+| `halopsa-mcp-halo-url` | HaloPSA instance URL, e.g. `https://psa.example.com` |
+| `halopsa-mcp-client-id` | Client ID from the HaloPSA OAuth application |
+| `halopsa-mcp-tenant` | Tenant name for hosted HaloPSA; empty string for on-premise |
+| `halopsa-mcp-encryption-key` | Random 32+ character string (`openssl rand -base64 32`) |
+| `halopsa-mcp-public-domain` | VM domain, e.g. `your-label.westeurope.cloudapp.azure.com` |
+| `halopsa-mcp-db-password` | Strong password for the Postgres database |
+
+There is no client secret — the HaloPSA OAuth application uses Authorization Code + PKCE.
+
+---
+
+## 3. Install Docker
 
 SSH into the VM and run the following:
 
@@ -62,15 +89,21 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
+Install the Azure CLI (needed for Key Vault access):
+
+```bash
+curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+```
+
 Verify:
 
 ```bash
-docker --version && docker compose version
+docker --version && docker compose version && az --version
 ```
 
 ---
 
-## 3. HaloPSA OAuth Application
+## 4. HaloPSA OAuth Application
 
 In your HaloPSA instance:
 
@@ -84,42 +117,24 @@ In your HaloPSA instance:
 
 ---
 
-## 4. Clone and Configure
+## 5. Clone, Fetch Secrets and Start
 
 ```bash
 git clone -b development https://github.com/CardoKrys/halopsa-mcp.git
 cd halopsa-mcp
-cp .env.example .env
-```
-
-Edit `.env` and fill in the required values:
-
-```bash
-nano .env
-```
-
-| Variable | Value |
-|----------|-------|
-| `HMCP_HALO_URL` | Your HaloPSA instance URL, e.g. `https://psa.example.com` |
-| `HMCP_HALO_CLIENT_ID` | Client ID from the OAuth application |
-| `HMCP_HALO_CLIENT_SECRET` | Leave blank (not used with Authorization Code + PKCE) |
-| `HMCP_HALO_TENANT` | Tenant name for hosted HaloPSA; leave empty for on-premise |
-| `HMCP_ENCRYPTION_KEY` | Random 32+ character string — generate with `openssl rand -base64 32` |
-| `HMCP_PUBLIC_DOMAIN` | Your VM's domain, e.g. `your-label.westeurope.cloudapp.azure.com` |
-| `HMCP_DB_PASSWORD` | Set a strong password (replaces the default `hmcp`) |
-
-Leave `HMCP_SEMANTIC_SEARCH=false`.
-
----
-
-## 5. Create Volumes and Start
-
-```bash
+chmod +x fetch-secrets.sh
+./fetch-secrets.sh
 docker volume create hmcp-postgres
 docker compose up -d --build
 ```
 
 The first build compiles Rust from source and takes approximately 5-10 minutes. Subsequent starts are fast.
+
+If your public domain differs from what is stored in Key Vault (e.g. a new VM with a different DNS label), override it:
+
+```bash
+./fetch-secrets.sh --domain your-new-label.westeurope.cloudapp.azure.com
+```
 
 Verify all containers are running:
 
@@ -157,7 +172,7 @@ Each user authenticates individually with their own HaloPSA account. All API cal
 ## Endpoints
 
 | Endpoint | Purpose |
-|----------|---------|
+|----------|---------| 
 | `/health` | Health check |
 | `/mcp/sse` | MCP transport (SSE and Streamable HTTP) |
 | `/authorize` | OAuth authorisation |
@@ -189,3 +204,5 @@ docker compose down
 git pull origin development
 docker compose up -d --build
 ```
+
+**Rotate secrets:** re-run `./fetch-secrets.sh` then `docker compose restart hmcp-server`.
