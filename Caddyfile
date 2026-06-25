@@ -1,0 +1,3 @@
+halopsa-mcp-test.westeurope.cloudapp.azure.com {
+    reverse_proxy hmcp-server:8080
+}

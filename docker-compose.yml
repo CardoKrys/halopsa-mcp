@@ -19,38 +19,32 @@ services:
       context: .
       dockerfile: Dockerfile
       target: server
-    ports:
-      - "8080:8080"
+    expose:
+      - "8080"
     env_file: .env
     environment:
       HMCP_DATABASE_URL: postgres://${HMCP_DB_USER:-hmcp}:${HMCP_DB_PASSWORD:-hmcp}@postgres:5432/${HMCP_DB_NAME:-hmcp}
     depends_on:
       postgres:
         condition: service_healthy
-      hmcp-embedder:
-        condition: service_started
     restart: unless-stopped
 
-  hmcp-embedder:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: embedder
-    env_file: .env
-    environment:
-      HMCP_DATABASE_URL: postgres://${HMCP_DB_USER:-hmcp}:${HMCP_DB_PASSWORD:-hmcp}@postgres:5432/${HMCP_DB_NAME:-hmcp}
-      HMCP_EMBED_CACHE_DIR: /models
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
-      - hmcp-models:/models
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - hmcp-caddy-data:/data
+      - hmcp-caddy-config:/config
     depends_on:
-      postgres:
-        condition: service_healthy
+      - hmcp-server
     restart: unless-stopped
 
 volumes:
   hmcp-postgres:
     external: true
     name: hmcp-postgres
-  hmcp-models:
-    external: true
-    name: hmcp-models
+  hmcp-caddy-data:
+  hmcp-caddy-config:

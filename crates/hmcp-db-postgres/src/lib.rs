@@ -49,34 +49,54 @@ impl PostgresDb {
         Ok(db)
     }
 
-    async fn init_schema(&self) -> Result<(), String> {
-        // pgvector extension + core auth tables. Always safe to re-run.
+ async fn init_schema(&self) -> Result<(), String> {
+        sqlx::query("CREATE EXTENSION IF NOT EXISTS vector")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| format!("Core schema init failed: {e}"))?;
+
         sqlx::query(
-            "CREATE EXTENSION IF NOT EXISTS vector;
-
-             CREATE TABLE IF NOT EXISTS access_tokens (
+            "CREATE TABLE IF NOT EXISTS access_tokens (
                  token TEXT PRIMARY KEY,
                  halo_access_token TEXT NOT NULL,
                  halo_refresh_token TEXT NOT NULL,
                  created_at BIGINT NOT NULL
-             );
-             CREATE INDEX IF NOT EXISTS idx_tokens_created ON access_tokens(created_at);
-
-             CREATE TABLE IF NOT EXISTS refresh_tokens (
-                 token TEXT PRIMARY KEY,
-                 halo_access_token TEXT NOT NULL,
-                 halo_refresh_token TEXT NOT NULL,
-                 created_at BIGINT NOT NULL
-             );
-             CREATE INDEX IF NOT EXISTS idx_refresh_created ON refresh_tokens(created_at);",
+             )",
         )
         .execute(&self.pool)
         .await
         .map_err(|e| format!("Core schema init failed: {e}"))?;
+
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_tokens_created ON access_tokens(created_at)",
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Core schema init failed: {e}"))?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS refresh_tokens (
+                 token TEXT PRIMARY KEY,
+                 halo_access_token TEXT NOT NULL,
+                 halo_refresh_token TEXT NOT NULL,
+                 created_at BIGINT NOT NULL
+             )",
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Core schema init failed: {e}"))?;
+
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS idx_refresh_created ON refresh_tokens(created_at)",
+        )
+        .execute(&self.pool)
+        .await
+        .map_err(|e| format!("Core schema init failed: {e}"))?;
+
         Ok(())
     }
 
-    fn hash_token(token: &str) -> String {
+fn hash_token(token: &str) -> String {
         let hash = sha2::Sha256::digest(token.as_bytes());
         format!("{hash:x}")
     }
