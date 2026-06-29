@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": {
+      "value": "halopsa-mcp"
+    },
+    "keyVaultName": {
+      "value": "HaloSecrets"
+    },
+
+    "haloUrl": {
+      "value": "REPLACE_WITH_LIVE_URL"
+    },
+    "haloClientId": {
+      "value": "REPLACE_WITH_LIVE_CLIENT_ID"
+    },
+    "haloTenant": {
+      "value": ""
+    },
+
+    "clientSecretSecretName": {
+      "value": "halopsa-mcp-live-halo-client-secret"
+    },
+    "encryptionKeySecretName": {
+      "value": "halopsa-mcp-live-encryption-key"
+    },
+    "databaseUrlSecretName": {
+      "value": "halopsa-mcp-live-database-url"
+    },
+
+    "semanticSearch": {
+      "value": false
+    },
+    "imageTag": {
+      "value": "latest"
+    }
+  }
+}

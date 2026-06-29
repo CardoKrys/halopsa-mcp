@@ -7,3 +7,13 @@ FROM debian:bookworm-slim AS server
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/hmcp-server /usr/local/bin/
 ENTRYPOINT ["hmcp-server"]
+
+FROM rust:1.88-bookworm AS embedder-builder
+WORKDIR /app
+COPY . .
+RUN cargo build --release --bin hmcp-embedder
+
+FROM debian:bookworm-slim AS embedder
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=embedder-builder /app/target/release/hmcp-embedder /usr/local/bin/
+ENTRYPOINT ["hmcp-embedder"]
