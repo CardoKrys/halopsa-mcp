@@ -1,14 +1,15 @@
 // HaloPSA MCP — Azure Container Apps + PostgreSQL Flexible Server deployment.
 //
+// No Key Vault dependency. Configuration is passed as plain environment variables
+// or Container App inline secrets (encrypted at rest in Azure).
+//
 // Provisions, in one resource group:
 //   - Azure Container Registry (for the `server` image)
-//   - User-assigned managed identity (AcrPull on the registry + Key Vault Secrets
-//     User on the existing HaloSecrets vault)
+//   - User-assigned managed identity (AcrPull on the registry)
 //   - PostgreSQL Flexible Server (public access + firewall, `vector` allowlisted)
 //   - Log Analytics workspace + Container Apps environment
 //   - The Container App itself (external ingress :8080, single replica)
 //
-// Networking model: public access + firewall (simplest path).
 // See INSTALL_AZURE.md for the full deploy walkthrough using deploy.sh.
 
 @description('Azure region for all resources.')
@@ -33,30 +34,11 @@ param pgAdminPassword string
 @description('Application database name.')
 param dbName string = 'hmcp'
 
-@description('Name of the existing Key Vault holding the halopsa-mcp-* secrets.')
-param keyVaultName string = 'HaloSecrets'
-
-@description('Resource group of the existing Key Vault (defaults to this RG).')
-param keyVaultResourceGroup string = resourceGroup().name
-
-@description('Key Vault secret name holding the HaloPSA OAuth client secret.')
-param clientSecretSecretName string = 'halopsa-mcp-halo-client-secret'
-
-@description('Key Vault secret name holding the AES-256-GCM encryption key.')
-param encryptionKeySecretName string = 'halopsa-mcp-encryption-key'
-
-@description('Key Vault secret name holding the full Postgres connection URL.')
-param databaseUrlSecretName string = 'halopsa-mcp-database-url'
-
-@description('HaloPSA OAuth client secret. Provide to (re)write it into Key Vault; leave empty on redeploys to preserve the existing value.')
+@description('AES-256-GCM encryption key (32+ chars). Required on every deploy — store in a password manager.')
 @secure()
-param haloClientSecret string = ''
+param encryptionKey string
 
-@description('AES-256-GCM encryption key (32+ chars). Provide ONCE on the first deploy; leave empty on every redeploy so it is never overwritten (changing it invalidates all stored tokens).')
-@secure()
-param encryptionKey string = ''
-
-@description('HaloPSA instance URL, e.g. https://psa.example.com')
+@description('HaloPSA instance URL, e.g. https://halosb.cardonet.com')
 param haloUrl string
 
 @description('HaloPSA OAuth Application client ID (Authorization Code flow).')
@@ -68,15 +50,13 @@ param haloTenant string = ''
 @description('Enable semantic search. Leave false unless the embedder is deployed.')
 param semanticSearch bool = false
 
-@description('Container image tag to run (push to ACR as halopsa-mcp-server:<tag>).')
+@description('Container image tag to run.')
 param imageTag string = 'latest'
 
 var containerAppName = namePrefix
 var imageName = 'halopsa-mcp-server'
-
-// Built-in role definition IDs.
 var acrPullRoleId = '7f951dda-4ed3-4680-a7ca-43fe172d538d'
-var kvSecretsUserRoleId = '4633458b-17de-408a-b874-0445c86b69e6'
+var databaseUrl = 'postgres://${pgAdminLogin}:${pgAdminPassword}@${pg.properties.fullyQualifiedDomainName}:5432/${dbName}?sslmode=require'
 
 resource acr 'Microsoft.ContainerRegistry/registries@2023-07-01' = {
   name: acrName
@@ -102,23 +82,6 @@ resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', acrPullRoleId)
     principalId: uami.properties.principalId
     principalType: 'ServicePrincipal'
-  }
-}
-
-// Existing Key Vault (may live in another resource group).
-resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' existing = {
-  name: keyVaultName
-  scope: resourceGroup(keyVaultResourceGroup)
-}
-
-// Grant the managed identity read access to the vault's secrets (cross-RG safe).
-module kvAccess 'modules/kv-access.bicep' = {
-  name: 'kv-secrets-user'
-  scope: resourceGroup(keyVaultResourceGroup)
-  params: {
-    keyVaultName: keyVaultName
-    principalId: uami.properties.principalId
-    roleDefinitionId: kvSecretsUserRoleId
   }
 }
 
@@ -149,9 +112,8 @@ resource pg 'Microsoft.DBforPostgreSQL/flexibleServers@2023-06-01-preview' = {
   }
 }
 
-// Allowlist the pgvector extension. Only consumed when HMCP_SEMANTIC_SEARCH=true,
-// but allowlisting is harmless otherwise. An admin must still run
-// `CREATE EXTENSION IF NOT EXISTS vector;` once in the target database.
+// Allowlist the pgvector extension (harmless when semanticSearch=false).
+// An admin must still run `CREATE EXTENSION IF NOT EXISTS vector;` once if enabling semantic search.
 resource pgExtensions 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@2023-06-01-preview' = {
   parent: pg
   name: 'azure.extensions'
@@ -161,10 +123,8 @@ resource pgExtensions 'Microsoft.DBforPostgreSQL/flexibleServers/configurations@
   }
 }
 
-// "Allow public access from any Azure service within Azure to this server."
-// The Container App's egress IPs are not static on a non-VNet environment, so
-// this is the simplest way to let it connect. Tighten or replace with a private
-// endpoint when moving to the VNet-integrated model.
+// Allows all Azure-egress IPs to reach Postgres. Container App egress IPs are
+// not static without VNet integration — this is the simplest approach for now.
 resource pgFirewallAzure 'Microsoft.DBforPostgreSQL/flexibleServers/firewallRules@2023-06-01-preview' = {
   parent: pg
   name: 'AllowAllAzureServicesAndResourcesWithinAzureIps'
@@ -180,26 +140,6 @@ resource pgDatabase 'Microsoft.DBforPostgreSQL/flexibleServers/databases@2023-06
   properties: {
     charset: 'UTF8'
     collation: 'en_US.utf8'
-  }
-}
-
-// Write the secrets into the existing vault (write-if-provided; see module).
-// The DB URL is composed inside the module so the password stays a secure value.
-// The deploying principal needs `Key Vault Secrets Officer` on the vault.
-module kvSecrets 'modules/kv-secrets.bicep' = {
-  name: 'kv-secrets'
-  scope: resourceGroup(keyVaultResourceGroup)
-  params: {
-    keyVaultName: keyVaultName
-    clientSecretSecretName: clientSecretSecretName
-    encryptionKeySecretName: encryptionKeySecretName
-    databaseUrlSecretName: databaseUrlSecretName
-    haloClientSecret: haloClientSecret
-    encryptionKey: encryptionKey
-    pgAdminLogin: pgAdminLogin
-    pgAdminPassword: pgAdminPassword
-    pgFqdn: pg.properties.fullyQualifiedDomainName
-    dbName: dbName
   }
 }
 
@@ -228,9 +168,6 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
   }
 }
 
-// Ingress FQDN is deterministic once the environment exists, so we can feed it
-// to HMCP_PUBLIC_DOMAIN in the same deployment. Register
-// https://<this>/callback as the redirect URI on the HaloPSA OAuth Application.
 var publicDomain = '${containerAppName}.${env.properties.defaultDomain}'
 
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
@@ -258,21 +195,16 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           identity: uami.id
         }
       ]
+      // Inline secrets — encrypted at rest in Azure, no Key Vault required.
+      // encryptionKey and databaseUrl are sensitive; everything else is a plain env var.
       secrets: [
         {
-          name: 'halo-client-secret'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${clientSecretSecretName}'
-          identity: uami.id
-        }
-        {
           name: 'encryption-key'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${encryptionKeySecretName}'
-          identity: uami.id
+          value: encryptionKey
         }
         {
           name: 'database-url'
-          keyVaultUrl: '${keyVault.properties.vaultUri}secrets/${databaseUrlSecretName}'
-          identity: uami.id
+          value: databaseUrl
         }
       ]
     }
@@ -286,46 +218,16 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             memory: '1Gi'
           }
           env: [
-            {
-              name: 'HMCP_HALO_URL'
-              value: haloUrl
-            }
-            {
-              name: 'HMCP_HALO_CLIENT_ID'
-              value: haloClientId
-            }
-            {
-              name: 'HMCP_HALO_TENANT'
-              value: haloTenant
-            }
-            {
-              name: 'HMCP_HALO_CLIENT_SECRET'
-              secretRef: 'halo-client-secret'
-            }
-            {
-              name: 'HMCP_ENCRYPTION_KEY'
-              secretRef: 'encryption-key'
-            }
-            {
-              name: 'HMCP_DATABASE_URL'
-              secretRef: 'database-url'
-            }
-            {
-              name: 'HMCP_PUBLIC_DOMAIN'
-              value: publicDomain
-            }
-            {
-              name: 'HMCP_HOST'
-              value: '0.0.0.0'
-            }
-            {
-              name: 'HMCP_PORT'
-              value: '8080'
-            }
-            {
-              name: 'HMCP_SEMANTIC_SEARCH'
-              value: string(semanticSearch)
-            }
+            { name: 'HMCP_HALO_URL', value: haloUrl }
+            { name: 'HMCP_HALO_CLIENT_ID', value: haloClientId }
+            { name: 'HMCP_HALO_TENANT', value: haloTenant }
+            { name: 'HMCP_HALO_CLIENT_SECRET', value: '' }
+            { name: 'HMCP_ENCRYPTION_KEY', secretRef: 'encryption-key' }
+            { name: 'HMCP_DATABASE_URL', secretRef: 'database-url' }
+            { name: 'HMCP_PUBLIC_DOMAIN', value: publicDomain }
+            { name: 'HMCP_HOST', value: '0.0.0.0' }
+            { name: 'HMCP_PORT', value: '8080' }
+            { name: 'HMCP_SEMANTIC_SEARCH', value: string(semanticSearch) }
           ]
         }
       ]
@@ -338,11 +240,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       }
     }
   }
-  // The first revision needs: the secrets present in the vault (kvSecrets), the
-  // MI's read role propagated (kvAccess), and image-pull rights (acrPull).
   dependsOn: [
-    kvSecrets
-    kvAccess
     acrPull
   ]
 }
