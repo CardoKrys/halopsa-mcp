@@ -5,30 +5,15 @@
     "namePrefix": {
       "value": "halopsa-mcp"
     },
-    "keyVaultName": {
-      "value": "HaloSecrets"
-    },
-
     "haloUrl": {
-      "value": "REPLACE_WITH_LIVE_URL"
+      "value": "https://halosb.cardonet.com"
     },
     "haloClientId": {
-      "value": "REPLACE_WITH_LIVE_CLIENT_ID"
+      "value": "e2629a44-9e6c-44cd-8b7d-12729bd6554d"
     },
     "haloTenant": {
       "value": ""
     },
-
-    "clientSecretSecretName": {
-      "value": "halopsa-mcp-live-halo-client-secret"
-    },
-    "encryptionKeySecretName": {
-      "value": "halopsa-mcp-live-encryption-key"
-    },
-    "databaseUrlSecretName": {
-      "value": "halopsa-mcp-live-database-url"
-    },
-
     "semanticSearch": {
       "value": false
     },
