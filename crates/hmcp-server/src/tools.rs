@@ -70,6 +70,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "agent_id": { "type": "integer", "description": "Reassign to this agent" },
                     "team_id": { "type": "integer", "description": "Move to this team/queue" },
                     "status_id": { "type": "integer", "description": "Change status" },
+                    "tickettype_id": { "type": "integer", "description": "Change ticket type" },
                     "priority_id": { "type": "integer", "description": "Change priority" },
                     "category_1": { "type": "string", "description": "Change primary category" },
                     "category_2": { "type": "string", "description": "Change secondary category" },
@@ -143,16 +144,17 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "change_ticket_status_with_note",
-            "description": "Change a ticket's status and add a note in one operation.",
+            "description": "Change a ticket's status via a workflow transition and add a note in one operation. HaloPSA enforces status changes through workflow transitions — provide workflow_action_id for a guaranteed transition (get it from get_available_actions), or status_id as a best-effort match against the ticket's currently available transitions (fails with the real options listed if none match).",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "ticket_id": { "type": "integer", "description": "The ticket ID" },
-                    "status_id": { "type": "integer", "description": "The new status ID (use list_statuses to find valid IDs)" },
+                    "workflow_action_id": { "type": "integer", "description": "The workflow action ID to execute (from get_available_actions) — guaranteed to work, preferred over status_id" },
+                    "status_id": { "type": "integer", "description": "Target status ID (use list_statuses to find valid IDs). Best-effort: matched against the ticket's currently available workflow transitions; fails with the available options if none lead to this status" },
                     "note": { "type": "string", "description": "Note to add alongside the status change" },
                     "hidden_from_user": { "type": "boolean", "description": "Hide the note from the end user (default false)", "default": false }
                 },
-                "required": ["ticket_id", "status_id", "note"]
+                "required": ["ticket_id", "note"]
             }
         }),
         json!({
@@ -482,6 +484,7 @@ async fn exec_update_ticket(args: &Value, client: &HaloPSAClient) -> Result<Stri
         "team_id",
         "status_id",
         "priority_id",
+        "tickettype_id",
         "category_1",
         "category_2",
         "category_3",
@@ -581,7 +584,7 @@ async fn exec_add_action(args: &Value, client: &HaloPSAClient) -> Result<String,
         .unwrap_or(false);
 
     let result = client
-        .create_action(ticket_id, note, outcome, workflow_action_id, None, hidden)
+        .create_action(ticket_id, note, outcome, workflow_action_id, hidden)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -633,7 +636,7 @@ async fn exec_execute_workflow_action(
     let note = args.get("note").and_then(|v| v.as_str()).unwrap_or("");
 
     let result = client
-        .create_action(ticket_id, note, "note", Some(action_id), None, false)
+        .create_action(ticket_id, note, "note", Some(action_id), false)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -798,7 +801,7 @@ async fn exec_send_email_reply(args: &Value, client: &HaloPSAClient) -> Result<S
         .ok_or("message is required")?;
 
     let result = client
-        .create_action(ticket_id, message, "reply", None, None, false)
+        .create_action(ticket_id, message, "reply", None, false)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -814,7 +817,7 @@ async fn exec_add_internal_note(args: &Value, client: &HaloPSAClient) -> Result<
         .ok_or("note is required")?;
 
     let result = client
-        .create_action(ticket_id, note, "note", None, None, true)
+        .create_action(ticket_id, note, "note", None, true)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -827,10 +830,6 @@ async fn exec_change_ticket_status_with_note(
         .get("ticket_id")
         .and_then(|v| v.as_i64())
         .ok_or("ticket_id is required")?;
-    let status_id = args
-        .get("status_id")
-        .and_then(|v| v.as_i64())
-        .ok_or("status_id is required")?;
     let note = args
         .get("note")
         .and_then(|v| v.as_str())
@@ -839,13 +838,45 @@ async fn exec_change_ticket_status_with_note(
         .get("hidden_from_user")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
+    let explicit_workflow_action_id = args.get("workflow_action_id").and_then(|v| v.as_i64());
+    let status_id = args.get("status_id").and_then(|v| v.as_i64());
 
-    // Status changes go through the action payload's status_id field
-    // (mirroring the note+status form in HaloPSA's own agent UI), not a
-    // direct ticket field update — a plain update_ticket status_id write
-    // was silently ignored by HaloPSA for workflow-driven ticket types.
+    // Ticket status is workflow-driven on this HaloPSA instance — confirmed
+    // on multiple ticket types that a direct status_id write (ticket field
+    // or action field) is silently ignored. The only confirmed working
+    // mechanism is a workflow transition, same as execute_workflow_action.
+    // If the caller only has a target status_id (not a workflow_action_id),
+    // best-effort match it against the current step's available
+    // transitions by end_step. If nothing matches, fail loudly with the
+    // real options instead of silently doing nothing.
+    let workflow_action_id = match explicit_workflow_action_id {
+        Some(id) => id,
+        None => {
+            let target_status = status_id
+                .ok_or("Either workflow_action_id or status_id is required")?;
+            let available = client.get_available_actions(ticket_id).await?;
+            match available.iter().find(|a| a.end_step == Some(target_status)) {
+                Some(a) => a.id,
+                None => {
+                    let options: Vec<String> = available
+                        .iter()
+                        .map(|a| format!("{} (workflow_action_id: {})", a.action_name, a.id))
+                        .collect();
+                    return Err(format!(
+                        "HaloPSA enforces ticket status changes through workflow transitions, \
+                         not a direct status_id write. No available transition from the \
+                         ticket's current step leads to status_id {target_status}. \
+                         Available transitions: {}. Call get_available_actions to see options, \
+                         or pass workflow_action_id explicitly.",
+                        if options.is_empty() { "none".to_string() } else { options.join(", ") }
+                    ));
+                }
+            }
+        }
+    };
+
     let result = client
-        .create_action(ticket_id, note, "note", None, Some(status_id), hidden)
+        .create_action(ticket_id, note, "note", Some(workflow_action_id), hidden)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }

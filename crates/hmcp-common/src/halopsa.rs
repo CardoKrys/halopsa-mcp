@@ -178,17 +178,18 @@ impl HaloPSAClient {
         Ok(parse_halo_list::<Value>(value))
     }
 
-    /// Create an action (note/reply) on a ticket. `status_id`, when set,
-    /// requests a ticket status change alongside the note — mirrors how
-    /// HaloPSA's own agent UI submits a note and a status change together
-    /// as a single action.
+    /// Create an action (note/reply) on a ticket, optionally executing a
+    /// workflow transition via `workflow_action_id`. Ticket status is
+    /// workflow-driven on this instance (confirmed on multiple ticket
+    /// types) — putting `status_id` directly on the ticket or the action
+    /// payload is silently ignored. The only confirmed way to change
+    /// status is a workflow transition, i.e. `workflow_action_id`.
     pub async fn create_action(
         &self,
         ticket_id: i64,
         note: &str,
         outcome: &str,
         workflow_action_id: Option<i64>,
-        status_id: Option<i64>,
         hidden_from_user: bool,
     ) -> Result<Value, String> {
         let mut action = json!({
@@ -199,9 +200,6 @@ impl HaloPSAClient {
         });
         if let Some(wf_id) = workflow_action_id {
             action["workflow_subdetail_id"] = json!(wf_id);
-        }
-        if let Some(sid) = status_id {
-            action["status_id"] = json!(sid);
         }
         self.post("/api/Actions", &json!([action])).await
     }
