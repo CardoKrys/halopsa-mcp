@@ -1,12 +1,27 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use base64::Engine;
 use reqwest::Client;
 use serde_json::{json, Value};
 use tokio::sync::Mutex;
 use zeroize::Zeroize;
 
 use crate::types::*;
+
+/// Decode a JWT's payload claims without verifying the signature. Only
+/// safe for display purposes — never use this for authorization decisions.
+/// Returns None if the token isn't a 3-part JWT or the payload isn't JSON.
+fn decode_jwt_claims(token: &str) -> Option<Value> {
+    let parts: Vec<&str> = token.split('.').collect();
+    if parts.len() != 3 {
+        return None;
+    }
+    let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(parts[1])
+        .ok()?;
+    serde_json::from_slice(&payload).ok()
+}
 
 const MAX_RESPONSE_SIZE: u64 = 50 * 1024 * 1024; // 50MB
 const RATE_LIMIT_REQUESTS: u32 = 400;
@@ -113,10 +128,7 @@ impl HaloPSAClient {
         let record_count = value.get("record_count")
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
-        let records = value.get("records")
-            .and_then(|v| v.as_array())
-            .cloned()
-            .unwrap_or_default();
+        let records = parse_halo_list::<Value>(value);
 
         Ok((records, record_count))
     }
@@ -166,13 +178,17 @@ impl HaloPSAClient {
         Ok(parse_halo_list::<Value>(value))
     }
 
-    /// Create an action (note/reply) on a ticket.
+    /// Create an action (note/reply) on a ticket. `status_id`, when set,
+    /// requests a ticket status change alongside the note — mirrors how
+    /// HaloPSA's own agent UI submits a note and a status change together
+    /// as a single action.
     pub async fn create_action(
         &self,
         ticket_id: i64,
         note: &str,
         outcome: &str,
         workflow_action_id: Option<i64>,
+        status_id: Option<i64>,
         hidden_from_user: bool,
     ) -> Result<Value, String> {
         let mut action = json!({
@@ -183,6 +199,9 @@ impl HaloPSAClient {
         });
         if let Some(wf_id) = workflow_action_id {
             action["workflow_subdetail_id"] = json!(wf_id);
+        }
+        if let Some(sid) = status_id {
+            action["status_id"] = json!(sid);
         }
         self.post("/api/Actions", &json!([action])).await
     }
@@ -206,14 +225,17 @@ impl HaloPSAClient {
         self.post("/api/Actions", &json!([body])).await
     }
 
-    /// Update an existing action's note text.
+    /// Update an existing action's note text. HaloPSA requires ticket_id on
+    /// the action update payload ("An Action must be associated with a
+    /// ticket_id"), even though the action_id alone identifies the record.
     pub async fn update_action(
         &self,
+        ticket_id: i64,
         action_id: i64,
         note: &str,
         hidden_from_user: Option<bool>,
     ) -> Result<Value, String> {
-        let mut body = json!({ "id": action_id, "note": note });
+        let mut body = json!({ "id": action_id, "ticket_id": ticket_id, "note": note });
         if let Some(hidden) = hidden_from_user {
             body["hiddenfromuser"] = json!(hidden);
         }
@@ -225,11 +247,15 @@ impl HaloPSAClient {
         self.delete(&format!("/api/Actions/{action_id}")).await
     }
 
-    /// Get a single action by ID.
-    pub async fn get_action(&self, action_id: i64) -> Result<Value, String> {
+    /// Get a single action by ID. HaloPSA requires ticket_id as a query
+    /// param ("ticket_id must be specified") even when fetching by action_id.
+    pub async fn get_action(&self, ticket_id: i64, action_id: i64) -> Result<Value, String> {
         self.get_raw(
             &format!("/api/Actions/{action_id}"),
-            &[("includedetails", "true".into())],
+            &[
+                ("ticket_id", ticket_id.to_string()),
+                ("includedetails", "true".into()),
+            ],
         )
         .await
     }
@@ -323,9 +349,25 @@ impl HaloPSAClient {
         self.get_no_params(&format!("/api/Agent/{agent_id}")).await
     }
 
-    /// Get current user info from the "me" endpoint.
+    /// Get current user info. /api/AuthInfo only returns server/tenant
+    /// metadata (auth_url, integrationServiceUrl, tenant_id) on this
+    /// instance, not the agent's own identity. HaloPSA's OAuth server
+    /// issues JWT access tokens, so as a best-effort enrichment we decode
+    /// the token's claims (no signature verification needed — we only use
+    /// this for display, HaloPSA itself still enforces authorization on
+    /// every request) to surface agent id/name/email when present.
     pub async fn get_me(&self) -> Result<Value, String> {
-        self.get_no_params("/api/AuthInfo").await
+        let mut result = self.get_no_params("/api/AuthInfo").await?;
+        if let Some(claims) = decode_jwt_claims(&self.access_token) {
+            if let Some(obj) = result.as_object_mut() {
+                for key in ["sub", "agentid", "agent_id", "name", "email", "preferred_username"] {
+                    if let Some(v) = claims.get(key) {
+                        obj.insert(key.to_string(), v.clone());
+                    }
+                }
+            }
+        }
+        Ok(result)
     }
 
     /// Search tickets by keyword.

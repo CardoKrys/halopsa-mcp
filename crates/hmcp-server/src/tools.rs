@@ -187,11 +187,12 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
+                    "ticket_id": { "type": "integer", "description": "The ticket ID the action belongs to" },
                     "action_id": { "type": "integer", "description": "The action ID to update" },
                     "note": { "type": "string", "description": "The new note content" },
                     "hidden_from_user": { "type": "boolean", "description": "Change visibility — true hides from end user" }
                 },
-                "required": ["action_id", "note"]
+                "required": ["ticket_id", "action_id", "note"]
             }
         }),
         json!({
@@ -211,9 +212,10 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
+                    "ticket_id": { "type": "integer", "description": "The ticket ID the action belongs to" },
                     "action_id": { "type": "integer", "description": "The action ID" }
                 },
-                "required": ["action_id"]
+                "required": ["ticket_id", "action_id"]
             }
         }),
         json!({
@@ -579,7 +581,7 @@ async fn exec_add_action(args: &Value, client: &HaloPSAClient) -> Result<String,
         .unwrap_or(false);
 
     let result = client
-        .create_action(ticket_id, note, outcome, workflow_action_id, hidden)
+        .create_action(ticket_id, note, outcome, workflow_action_id, None, hidden)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -631,7 +633,7 @@ async fn exec_execute_workflow_action(
     let note = args.get("note").and_then(|v| v.as_str()).unwrap_or("");
 
     let result = client
-        .create_action(ticket_id, note, "note", Some(action_id), false)
+        .create_action(ticket_id, note, "note", Some(action_id), None, false)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -739,6 +741,10 @@ async fn exec_log_time(args: &Value, client: &HaloPSAClient) -> Result<String, S
 }
 
 async fn exec_update_action(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let ticket_id = args
+        .get("ticket_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("ticket_id is required")?;
     let action_id = args
         .get("action_id")
         .and_then(|v| v.as_i64())
@@ -749,7 +755,7 @@ async fn exec_update_action(args: &Value, client: &HaloPSAClient) -> Result<Stri
         .ok_or("note is required")?;
     let hidden = args.get("hidden_from_user").and_then(|v| v.as_bool());
 
-    let result = client.update_action(action_id, note, hidden).await?;
+    let result = client.update_action(ticket_id, action_id, note, hidden).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -768,12 +774,16 @@ async fn exec_delete_action(args: &Value, client: &HaloPSAClient) -> Result<Stri
 }
 
 async fn exec_get_action(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let ticket_id = args
+        .get("ticket_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("ticket_id is required")?;
     let action_id = args
         .get("action_id")
         .and_then(|v| v.as_i64())
         .ok_or("action_id is required")?;
 
-    let result = client.get_action(action_id).await?;
+    let result = client.get_action(ticket_id, action_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -788,7 +798,7 @@ async fn exec_send_email_reply(args: &Value, client: &HaloPSAClient) -> Result<S
         .ok_or("message is required")?;
 
     let result = client
-        .create_action(ticket_id, message, "reply", None, false)
+        .create_action(ticket_id, message, "reply", None, None, false)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -804,7 +814,7 @@ async fn exec_add_internal_note(args: &Value, client: &HaloPSAClient) -> Result<
         .ok_or("note is required")?;
 
     let result = client
-        .create_action(ticket_id, note, "note", None, true)
+        .create_action(ticket_id, note, "note", None, None, true)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -830,11 +840,12 @@ async fn exec_change_ticket_status_with_note(
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
 
-    client
-        .update_ticket(ticket_id, json!({ "status_id": status_id }))
-        .await?;
+    // Status changes go through the action payload's status_id field
+    // (mirroring the note+status form in HaloPSA's own agent UI), not a
+    // direct ticket field update — a plain update_ticket status_id write
+    // was silently ignored by HaloPSA for workflow-driven ticket types.
     let result = client
-        .create_action(ticket_id, note, "note", None, hidden)
+        .create_action(ticket_id, note, "note", None, Some(status_id), hidden)
         .await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
