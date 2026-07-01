@@ -23,6 +23,18 @@ fn decode_jwt_claims(token: &str) -> Option<Value> {
     serde_json::from_slice(&payload).ok()
 }
 
+/// Build a HaloPSA advanced_search value: a JSON array of filter objects.
+/// filter_type 4 is "contains", confirmed against the agent UI's own
+/// request for a client name search.
+fn advanced_search_filter(filter_name: &str, value: &str) -> String {
+    json!([{
+        "filter_name": filter_name,
+        "filter_type": 4,
+        "filter_value": value,
+    }])
+    .to_string()
+}
+
 const MAX_RESPONSE_SIZE: u64 = 50 * 1024 * 1024; // 50MB
 const RATE_LIMIT_REQUESTS: u32 = 400;
 const RATE_LIMIT_WINDOW: Duration = Duration::from_secs(300); // 5 minutes
@@ -348,7 +360,7 @@ impl HaloPSAClient {
         self.get_no_params(&format!("/api/Client/{client_id}")).await
     }
 
-    /// List clients with optional keyword search.
+    /// List clients with optional keyword search (by name).
     pub async fn list_clients(
         &self,
         page: i64,
@@ -356,11 +368,18 @@ impl HaloPSAClient {
         search: Option<&str>,
     ) -> Result<(Vec<Value>, i64), String> {
         let mut params: Vec<(&str, String)> = vec![
+            // HaloPSA ignores page_size on this endpoint unless pageinate=true
+            // is also set, confirmed against the agent UI's own request.
+            ("pageinate", "true".into()),
             ("page_no", page.to_string()),
             ("page_size", page_size.max(1).min(100).to_string()),
+            ("includecolumns", "true".into()),
         ];
         if let Some(s) = search {
-            params.push(("search", s.to_string()));
+            // A plain "search" param is silently ignored on /api/Client —
+            // name filtering requires advanced_search, a JSON-encoded array
+            // of filter objects, confirmed against the agent UI's own request.
+            params.push(("advanced_search", advanced_search_filter("name", s)));
         }
         let value = self.get_raw("/api/Client", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
@@ -382,6 +401,7 @@ impl HaloPSAClient {
         search: Option<&str>,
     ) -> Result<(Vec<Value>, i64), String> {
         let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
             ("page_no", page.to_string()),
             ("page_size", page_size.max(1).min(100).to_string()),
         ];
@@ -389,7 +409,10 @@ impl HaloPSAClient {
             params.push(("client_id", id.to_string()));
         }
         if let Some(s) = search {
-            params.push(("search", s.to_string()));
+            // Unconfirmed against the sandbox — mirrors the advanced_search
+            // fix confirmed for /api/Client, same underlying list mechanism.
+            // A plain "search" param was never confirmed working here either.
+            params.push(("advanced_search", advanced_search_filter("name", s)));
         }
         let value = self.get_raw("/api/Users", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
