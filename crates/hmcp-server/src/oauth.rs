@@ -468,16 +468,40 @@ async fn handle_refresh_token_grant(state: AppState, form: &mut TokenForm) -> Re
         }
     };
 
-    let (halo_at, halo_rt) = creds;
+    let (_halo_at, halo_rt) = creds;
 
-    // Try to refresh the HaloPSA token if we have a refresh token
-    let (new_halo_at, new_halo_rt) = if !halo_rt.is_empty() {
-        match refresh_halo_token(&state, &halo_rt).await {
-            Ok((at, rt)) => (at, rt),
-            Err(_) => (halo_at, halo_rt), // Fall back to existing tokens
+    // Refresh the underlying HaloPSA token. We must not silently reuse the
+    // old HaloPSA access token on failure — that would hand back a valid
+    // MCP-level token wrapping a dead HaloPSA token, so the client thinks
+    // re-authentication succeeded while every subsequent HaloPSA API call
+    // keeps failing with 401. Treat any failure as invalid_grant so the
+    // client is forced through a full re-authorization instead.
+    if halo_rt.is_empty() {
+        let _ = state.db.delete_refresh_token(&refresh_token).await;
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "error": "invalid_grant",
+                "error_description": "No HaloPSA refresh token available; re-authorization required"
+            })),
+        )
+            .into_response();
+    }
+
+    let (new_halo_at, new_halo_rt) = match refresh_halo_token(&state, &halo_rt).await {
+        Ok((at, rt)) => (at, rt),
+        Err(e) => {
+            eprintln!("HaloPSA token refresh failed: {e}");
+            let _ = state.db.delete_refresh_token(&refresh_token).await;
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "invalid_grant",
+                    "error_description": "HaloPSA token refresh failed; re-authorization required"
+                })),
+            )
+                .into_response();
         }
-    } else {
-        (halo_at, halo_rt)
     };
 
     // Rotate: delete old, issue new
