@@ -187,6 +187,53 @@ impl HaloPSAClient {
         self.post("/api/Actions", &json!([action])).await
     }
 
+    /// Log time against a ticket by creating a time-entry action.
+    /// `time_minutes` is converted to decimal hours (timetaken field).
+    pub async fn log_time(
+        &self,
+        ticket_id: i64,
+        time_minutes: f64,
+        note: &str,
+        hidden_from_user: bool,
+    ) -> Result<Value, String> {
+        let timetaken = time_minutes / 60.0;
+        let body = json!({
+            "ticket_id": ticket_id,
+            "note": note,
+            "timetaken": timetaken,
+            "hiddenfromuser": hidden_from_user,
+        });
+        self.post("/api/Actions", &json!([body])).await
+    }
+
+    /// Update an existing action's note text.
+    pub async fn update_action(
+        &self,
+        action_id: i64,
+        note: &str,
+        hidden_from_user: Option<bool>,
+    ) -> Result<Value, String> {
+        let mut body = json!({ "id": action_id, "note": note });
+        if let Some(hidden) = hidden_from_user {
+            body["hiddenfromuser"] = json!(hidden);
+        }
+        self.post("/api/Actions", &json!([body])).await
+    }
+
+    /// Delete an action by ID.
+    pub async fn delete_action(&self, action_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/Actions/{action_id}")).await
+    }
+
+    /// Get a single action by ID.
+    pub async fn get_action(&self, action_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Actions/{action_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
     // --- Workflows ---
 
     /// Get a workflow by ID with full details (steps, stages, actions).
@@ -339,6 +386,28 @@ impl HaloPSAClient {
     /// GET with no query params.
     async fn get_no_params(&self, path: &str) -> Result<Value, String> {
         self.get_raw(path, &[]).await
+    }
+
+    async fn delete(&self, path: &str) -> Result<(), String> {
+        self.rate_limit.lock().await.check()?;
+
+        let url = format!("{}{}", self.base_url, path);
+        let resp = self
+            .http
+            .delete(&url)
+            .bearer_auth(&self.access_token)
+            .send()
+            .await
+            .map_err(|e| format!("HTTP request failed: {e}"))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            let preview = if body.len() > 500 { &body[..500] } else { &body };
+            return Err(format!("HaloPSA API error {status}: {preview}"));
+        }
+
+        Ok(())
     }
 
     async fn post(&self, path: &str, body: &Value) -> Result<Value, String> {

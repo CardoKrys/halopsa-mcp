@@ -103,7 +103,7 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "create_action",
+            "name": "add_action",
             "description": "Add a note or reply to a ticket. Can optionally include a workflow transition.",
             "inputSchema": {
                 "type": "object",
@@ -115,6 +115,105 @@ pub fn tool_definitions() -> Vec<Value> {
                     "hidden_from_user": { "type": "boolean", "description": "Hide this note from end users (default false)", "default": false }
                 },
                 "required": ["ticket_id", "note"]
+            }
+        }),
+        json!({
+            "name": "send_email_reply",
+            "description": "Send a visible email reply to the ticket contact. The reply is sent from your HaloPSA account and is visible to the end user.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": { "type": "integer", "description": "The ticket ID" },
+                    "message": { "type": "string", "description": "The reply message content" }
+                },
+                "required": ["ticket_id", "message"]
+            }
+        }),
+        json!({
+            "name": "add_internal_note",
+            "description": "Add a private internal note to a ticket. Visible to agents only — not sent to the end user.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": { "type": "integer", "description": "The ticket ID" },
+                    "note": { "type": "string", "description": "The internal note content" }
+                },
+                "required": ["ticket_id", "note"]
+            }
+        }),
+        json!({
+            "name": "change_ticket_status_with_note",
+            "description": "Change a ticket's status and add a note in one operation.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": { "type": "integer", "description": "The ticket ID" },
+                    "status_id": { "type": "integer", "description": "The new status ID (use list_statuses to find valid IDs)" },
+                    "note": { "type": "string", "description": "Note to add alongside the status change" },
+                    "hidden_from_user": { "type": "boolean", "description": "Hide the note from the end user (default false)", "default": false }
+                },
+                "required": ["ticket_id", "status_id", "note"]
+            }
+        }),
+        json!({
+            "name": "list_ticket_actions",
+            "description": "List all actions (notes, replies, workflow transitions) on a ticket. Alias for list_actions.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": { "type": "integer", "description": "The ticket ID" },
+                    "include_private": { "type": "boolean", "description": "Include private/internal notes (default false)", "default": false }
+                },
+                "required": ["ticket_id"]
+            }
+        }),
+        json!({
+            "name": "log_time",
+            "description": "Log time spent on a ticket. Time is recorded as an action/note entry.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "ticket_id": { "type": "integer", "description": "The ticket ID" },
+                    "time_minutes": { "type": "number", "description": "Time spent in minutes (e.g. 30 for half an hour, 90 for 1.5 hours)" },
+                    "note": { "type": "string", "description": "Description of work done (optional)", "default": "" },
+                    "hidden_from_user": { "type": "boolean", "description": "Hide from end user (default true for time entries)", "default": true }
+                },
+                "required": ["ticket_id", "time_minutes"]
+            }
+        }),
+        json!({
+            "name": "update_action",
+            "description": "Edit the text of an existing action (note or reply) on a ticket.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action_id": { "type": "integer", "description": "The action ID to update" },
+                    "note": { "type": "string", "description": "The new note content" },
+                    "hidden_from_user": { "type": "boolean", "description": "Change visibility — true hides from end user" }
+                },
+                "required": ["action_id", "note"]
+            }
+        }),
+        json!({
+            "name": "delete_action",
+            "description": "Delete an action (note or reply) from a ticket by its ID. Requires appropriate HaloPSA permissions.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action_id": { "type": "integer", "description": "The action ID to delete" }
+                },
+                "required": ["action_id"]
+            }
+        }),
+        json!({
+            "name": "get_action",
+            "description": "Get full details of a single action (note, reply, or transition) by its ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "action_id": { "type": "integer", "description": "The action ID" }
+                },
+                "required": ["action_id"]
             }
         }),
         json!({
@@ -232,8 +331,15 @@ pub async fn execute_tool(
         "create_ticket" => exec_create_ticket(args, client).await,
         "update_ticket" => exec_update_ticket(args, client).await,
         "search_tickets" => exec_search_tickets(args, client).await,
-        "list_actions" => exec_list_actions(args, client).await,
-        "create_action" => exec_create_action(args, client).await,
+        "list_actions" | "list_ticket_actions" => exec_list_actions(args, client).await,
+        "add_action" => exec_add_action(args, client).await,
+        "send_email_reply" => exec_send_email_reply(args, client).await,
+        "add_internal_note" => exec_add_internal_note(args, client).await,
+        "change_ticket_status_with_note" => exec_change_ticket_status_with_note(args, client).await,
+        "get_action" => exec_get_action(args, client).await,
+        "log_time" => exec_log_time(args, client).await,
+        "update_action" => exec_update_action(args, client).await,
+        "delete_action" => exec_delete_action(args, client).await,
         "get_available_actions" => exec_get_available_actions(args, client).await,
         "execute_workflow_action" => exec_execute_workflow_action(args, client).await,
         "list_statuses" => exec_list_statuses(client).await,
@@ -453,7 +559,7 @@ async fn exec_list_actions(args: &Value, client: &HaloPSAClient) -> Result<Strin
     .unwrap())
 }
 
-async fn exec_create_action(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+async fn exec_add_action(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let ticket_id = args
         .get("ticket_id")
         .and_then(|v| v.as_i64())
@@ -608,6 +714,129 @@ async fn exec_get_ticket_assets(args: &Value, client: &HaloPSAClient) -> Result<
         })
         .collect();
     Ok(serde_json::to_string_pretty(&json!({ "assets": summary })).unwrap())
+}
+
+async fn exec_log_time(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let ticket_id = args
+        .get("ticket_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("ticket_id is required")?;
+    let time_minutes = args
+        .get("time_minutes")
+        .and_then(|v| v.as_f64())
+        .ok_or("time_minutes is required")?;
+    let note = args
+        .get("note")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    let hidden = args
+        .get("hidden_from_user")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+
+    let result = client.log_time(ticket_id, time_minutes, note, hidden).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_action(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let action_id = args
+        .get("action_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("action_id is required")?;
+    let note = args
+        .get("note")
+        .and_then(|v| v.as_str())
+        .ok_or("note is required")?;
+    let hidden = args.get("hidden_from_user").and_then(|v| v.as_bool());
+
+    let result = client.update_action(action_id, note, hidden).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_action(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let action_id = args
+        .get("action_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("action_id is required")?;
+
+    client.delete_action(action_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({
+        "deleted": true,
+        "action_id": action_id
+    }))
+    .unwrap())
+}
+
+async fn exec_get_action(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let action_id = args
+        .get("action_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("action_id is required")?;
+
+    let result = client.get_action(action_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_send_email_reply(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let ticket_id = args
+        .get("ticket_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("ticket_id is required")?;
+    let message = args
+        .get("message")
+        .and_then(|v| v.as_str())
+        .ok_or("message is required")?;
+
+    let result = client
+        .create_action(ticket_id, message, "reply", None, false)
+        .await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_add_internal_note(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let ticket_id = args
+        .get("ticket_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("ticket_id is required")?;
+    let note = args
+        .get("note")
+        .and_then(|v| v.as_str())
+        .ok_or("note is required")?;
+
+    let result = client
+        .create_action(ticket_id, note, "note", None, true)
+        .await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_change_ticket_status_with_note(
+    args: &Value,
+    client: &HaloPSAClient,
+) -> Result<String, String> {
+    let ticket_id = args
+        .get("ticket_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("ticket_id is required")?;
+    let status_id = args
+        .get("status_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("status_id is required")?;
+    let note = args
+        .get("note")
+        .and_then(|v| v.as_str())
+        .ok_or("note is required")?;
+    let hidden = args
+        .get("hidden_from_user")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+
+    client
+        .update_ticket(ticket_id, json!({ "status_id": status_id }))
+        .await?;
+    let result = client
+        .create_action(ticket_id, note, "note", None, hidden)
+        .await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 // --- Semantic search tools ---
