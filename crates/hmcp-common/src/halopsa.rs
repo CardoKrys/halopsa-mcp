@@ -348,6 +348,55 @@ impl HaloPSAClient {
         self.get_no_params(&format!("/api/Client/{client_id}")).await
     }
 
+    /// List clients with optional keyword search.
+    pub async fn list_clients(
+        &self,
+        page: i64,
+        page_size: i64,
+        search: Option<&str>,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(s) = search {
+            params.push(("search", s.to_string()));
+        }
+        let value = self.get_raw("/api/Client", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    /// Search clients by keyword.
+    pub async fn search_clients(&self, query: &str, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        self.list_clients(1, page_size, Some(query)).await
+    }
+
+    /// List users (end-user contacts), optionally filtered by client and/or keyword.
+    pub async fn list_users(
+        &self,
+        page: i64,
+        page_size: i64,
+        client_id: Option<i64>,
+        search: Option<&str>,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(id) = client_id {
+            params.push(("client_id", id.to_string()));
+        }
+        if let Some(s) = search {
+            params.push(("search", s.to_string()));
+        }
+        let value = self.get_raw("/api/Users", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
     /// List ticket types.
     pub async fn list_ticket_types(&self) -> Result<Vec<Value>, String> {
         let value = self.get_no_params("/api/TicketType").await?;

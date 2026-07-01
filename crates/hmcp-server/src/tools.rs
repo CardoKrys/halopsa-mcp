@@ -271,6 +271,43 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "list_clients",
+            "description": "List clients with optional keyword search. Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 },
+                    "search": { "type": "string", "description": "Keyword search across client name" }
+                }
+            }
+        }),
+        json!({
+            "name": "search_clients",
+            "description": "Search clients by keyword. Returns matching clients ordered by relevance.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Search query" },
+                    "page_size": { "type": "integer", "description": "Max results (default 20)", "default": 20 }
+                },
+                "required": ["query"]
+            }
+        }),
+        json!({
+            "name": "list_users",
+            "description": "List users (end-user contacts) with optional client filter and keyword search. Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 },
+                    "client_id": { "type": "integer", "description": "Filter by client ID" },
+                    "search": { "type": "string", "description": "Keyword search across user name/email" }
+                }
+            }
+        }),
+        json!({
             "name": "get_me",
             "description": "Get information about the authenticated user (agent).",
             "inputSchema": { "type": "object", "properties": {} }
@@ -350,6 +387,9 @@ pub async fn execute_tool(
         "list_teams" => exec_list_teams(client).await,
         "list_ticket_types" => exec_list_ticket_types(client).await,
         "get_client" => exec_get_client(args, client).await,
+        "list_clients" => exec_list_clients(args, client).await,
+        "search_clients" => exec_search_clients(args, client).await,
+        "list_users" => exec_list_users(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
         "semantic_search" => {
@@ -690,6 +730,58 @@ async fn exec_get_client(args: &Value, client: &HaloPSAClient) -> Result<String,
 
     let result = client.get_client(client_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_clients(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let search = args.get("search").and_then(|v| v.as_str());
+
+    let (clients, total) = client.list_clients(page, page_size, search).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "clients": clients,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_search_clients(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let query = args
+        .get("query")
+        .and_then(|v| v.as_str())
+        .ok_or("query is required")?;
+    let page_size = args
+        .get("page_size")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(20);
+
+    let (clients, total) = client.search_clients(query, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "results": clients,
+        "total_count": total,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_users(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let client_id = args.get("client_id").and_then(|v| v.as_i64());
+    let search = args.get("search").and_then(|v| v.as_str());
+
+    let (users, total) = client.list_users(page, page_size, client_id, search).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "users": users,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
 }
 
 async fn exec_get_me(client: &HaloPSAClient) -> Result<String, String> {
