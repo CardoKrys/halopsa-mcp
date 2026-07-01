@@ -176,6 +176,7 @@ pub fn tool_definitions() -> Vec<Value> {
                     "ticket_id": { "type": "integer", "description": "The ticket ID" },
                     "time_minutes": { "type": "number", "description": "Time spent in minutes (e.g. 30 for half an hour, 90 for 1.5 hours)" },
                     "note": { "type": "string", "description": "Description of work done (optional)", "default": "" },
+                    "outcome": { "type": "string", "description": "Action outcome (default 'note')", "default": "note" },
                     "hidden_from_user": { "type": "boolean", "description": "Hide from end user (default true for time entries)", "default": true }
                 },
                 "required": ["ticket_id", "time_minutes"]
@@ -201,9 +202,10 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
+                    "ticket_id": { "type": "integer", "description": "The ticket ID the action belongs to" },
                     "action_id": { "type": "integer", "description": "The action ID to delete" }
                 },
-                "required": ["action_id"]
+                "required": ["ticket_id", "action_id"]
             }
         }),
         json!({
@@ -731,12 +733,16 @@ async fn exec_log_time(args: &Value, client: &HaloPSAClient) -> Result<String, S
         .get("note")
         .and_then(|v| v.as_str())
         .unwrap_or("");
+    let outcome = args
+        .get("outcome")
+        .and_then(|v| v.as_str())
+        .unwrap_or("note");
     let hidden = args
         .get("hidden_from_user")
         .and_then(|v| v.as_bool())
         .unwrap_or(true);
 
-    let result = client.log_time(ticket_id, time_minutes, note, hidden).await?;
+    let result = client.log_time(ticket_id, time_minutes, note, outcome, hidden).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -760,12 +766,16 @@ async fn exec_update_action(args: &Value, client: &HaloPSAClient) -> Result<Stri
 }
 
 async fn exec_delete_action(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let ticket_id = args
+        .get("ticket_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("ticket_id is required")?;
     let action_id = args
         .get("action_id")
         .and_then(|v| v.as_i64())
         .ok_or("action_id is required")?;
 
-    client.delete_action(action_id).await?;
+    client.delete_action(ticket_id, action_id).await?;
     Ok(serde_json::to_string_pretty(&json!({
         "deleted": true,
         "action_id": action_id
