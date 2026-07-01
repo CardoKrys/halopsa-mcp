@@ -220,19 +220,25 @@ pub struct EmbedJob {
 
 // --- API list response ---
 
-/// HaloPSA returns lists as either `{ record_count, records: [...] }` or bare arrays.
-/// This handles both.
+/// HaloPSA returns lists as either a bare array, or an object like
+/// `{ record_count, tickets: [...] }` / `{ record_count, actions: [...] }`.
+/// The array's key varies per endpoint (it's the resource name, not a fixed
+/// "records" key), so find the first array-valued field rather than assuming
+/// one specific key name.
 pub fn parse_halo_list<T: serde::de::DeserializeOwned>(value: serde_json::Value) -> Vec<T> {
     if let Some(arr) = value.as_array() {
-        arr.iter()
-            .filter_map(|v| serde_json::from_value(v.clone()).ok())
-            .collect()
-    } else if let Some(records) = value.get("records").and_then(|v| v.as_array()) {
-        records
+        return arr
             .iter()
             .filter_map(|v| serde_json::from_value(v.clone()).ok())
-            .collect()
-    } else {
-        Vec::new()
+            .collect();
     }
+    if let Some(obj) = value.as_object() {
+        if let Some(arr) = obj.values().find_map(|v| v.as_array()) {
+            return arr
+                .iter()
+                .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                .collect();
+        }
+    }
+    Vec::new()
 }
