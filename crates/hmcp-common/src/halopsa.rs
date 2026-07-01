@@ -208,17 +208,22 @@ impl HaloPSAClient {
 
     /// Log time against a ticket by creating a time-entry action.
     /// `time_minutes` is converted to decimal hours (timetaken field).
+    /// HaloPSA requires an outcome on every action ("An Outcome must be
+    /// entered for this Action"), same requirement create_action already
+    /// satisfies with its "note" default.
     pub async fn log_time(
         &self,
         ticket_id: i64,
         time_minutes: f64,
         note: &str,
+        outcome: &str,
         hidden_from_user: bool,
     ) -> Result<Value, String> {
         let timetaken = time_minutes / 60.0;
         let body = json!({
             "ticket_id": ticket_id,
             "note": note,
+            "outcome": outcome,
             "timetaken": timetaken,
             "hiddenfromuser": hidden_from_user,
         });
@@ -242,9 +247,14 @@ impl HaloPSAClient {
         self.post("/api/Actions", &json!([body])).await
     }
 
-    /// Delete an action by ID.
-    pub async fn delete_action(&self, action_id: i64) -> Result<(), String> {
-        self.delete(&format!("/api/Actions/{action_id}")).await
+    /// Delete an action by ID. HaloPSA requires ticket_id ("ticket_id must
+    /// be included when deleting an Action"), same as get_action/update_action.
+    pub async fn delete_action(&self, ticket_id: i64, action_id: i64) -> Result<(), String> {
+        self.delete(
+            &format!("/api/Actions/{action_id}"),
+            &[("ticket_id", ticket_id.to_string())],
+        )
+        .await
     }
 
     /// Get a single action by ID. HaloPSA requires ticket_id as a query
@@ -430,7 +440,7 @@ impl HaloPSAClient {
         self.get_raw(path, &[]).await
     }
 
-    async fn delete(&self, path: &str) -> Result<(), String> {
+    async fn delete(&self, path: &str, params: &[(&str, String)]) -> Result<(), String> {
         self.rate_limit.lock().await.check()?;
 
         let url = format!("{}{}", self.base_url, path);
@@ -438,6 +448,7 @@ impl HaloPSAClient {
             .http
             .delete(&url)
             .bearer_auth(&self.access_token)
+            .query(params)
             .send()
             .await
             .map_err(|e| format!("HTTP request failed: {e}"))?;
