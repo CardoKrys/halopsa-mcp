@@ -309,14 +309,14 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_reports",
-            "description": "List saved report definitions within a category. Use list_report_categories to find category IDs, or omit reportgroup_id / pass 0 for All Reports. Returns paginated results.",
+            "description": "List saved report definitions within a category (use list_report_categories to find category IDs, or pass 0 for All Reports), or search by name across every category. When search is provided, it takes priority and reportgroup_id is ignored — search spans all categories. Returns paginated results.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
                     "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 },
-                    "reportgroup_id": { "type": "integer", "description": "Category ID from list_report_categories (default 0 = All Reports)", "default": 0 },
-                    "search": { "type": "string", "description": "Keyword match on report name. Filters within the fetched page only (no server-side search confirmed for this endpoint) — increase page_size for broader coverage" }
+                    "reportgroup_id": { "type": "integer", "description": "Category ID from list_report_categories (default 0 = All Reports). Ignored if search is set.", "default": 0 },
+                    "search": { "type": "string", "description": "Keyword search on report name, across all categories" }
                 }
             }
         }),

@@ -421,10 +421,11 @@ impl HaloPSAClient {
     }
 
     /// List saved report definitions within a category (reportgroup_id=0
-    /// is "All Reports", confirmed against the agent UI). `search`
-    /// filters by name on our side after fetching — there's no confirmed
-    /// working keyword-search mechanism on this endpoint, so this only
-    /// matches within the fetched page rather than the full catalog.
+    /// is "All Reports"), or search by name across all categories.
+    /// Confirmed against the agent UI: search uses a plain `search` param
+    /// (unlike Clients/Users, which need advanced_search) and sends
+    /// reportgroup_id as the literal string "null" when searching —
+    /// distinct from reportgroup_id=0, and spans every category.
     pub async fn list_reports(
         &self,
         page: i64,
@@ -432,27 +433,23 @@ impl HaloPSAClient {
         reportgroup_id: i64,
         search: Option<&str>,
     ) -> Result<(Vec<Value>, i64), String> {
-        let params: Vec<(&str, String)> = vec![
+        let mut params: Vec<(&str, String)> = vec![
             ("pageinate", "true".into()),
             ("page_no", page.to_string()),
             ("page_size", page_size.max(1).min(100).to_string()),
             ("order", "name".into()),
             ("orderdesc", "false".into()),
             ("type", "0".into()),
-            ("reportgroup_id", reportgroup_id.to_string()),
         ];
+        if let Some(s) = search {
+            params.push(("reportgroup_id", "null".into()));
+            params.push(("search", s.to_string()));
+        } else {
+            params.push(("reportgroup_id", reportgroup_id.to_string()));
+        }
         let value = self.get_raw("/api/Report", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
-        let mut records = parse_halo_list::<Value>(value);
-        if let Some(s) = search {
-            let needle = s.to_lowercase();
-            records.retain(|r| {
-                r.get("name")
-                    .and_then(|v| v.as_str())
-                    .map(|n| n.to_lowercase().contains(&needle))
-                    .unwrap_or(false)
-            });
-        }
+        let records = parse_halo_list::<Value>(value);
         Ok((records, record_count))
     }
 
