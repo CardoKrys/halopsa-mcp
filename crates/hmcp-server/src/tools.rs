@@ -326,6 +326,40 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "get_lookup_values",
+            "description": "Get values for a HaloPSA lookup table by ID (e.g. lookupid 41 is report categories). Use when you need a specific lookup table's contents and know its ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "lookupid": { "type": "integer", "description": "The lookup table ID" },
+                    "istree": { "type": "boolean", "description": "Whether to return the tree-structured form (default true)", "default": true }
+                },
+                "required": ["lookupid"]
+            }
+        }),
+        json!({
+            "name": "get_agent",
+            "description": "Get details about a specific agent (staff member) by ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "agent_id": { "type": "integer", "description": "The agent ID" }
+                },
+                "required": ["agent_id"]
+            }
+        }),
+        json!({
+            "name": "list_workflow_steps",
+            "description": "List the steps and available transition actions for a workflow. Use get_ticket_type or a ticket's workflow_id to find the workflow ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "workflow_id": { "type": "integer", "description": "The workflow ID" }
+                },
+                "required": ["workflow_id"]
+            }
+        }),
+        json!({
             "name": "run_report",
             "description": "Run a saved HaloPSA report by ID and return its result rows. Use list_reports to find report IDs. The response includes filterable_columns — only filter on fields listed there. To narrow results, pass filters overriding the report's saved filter set.",
             "inputSchema": {
@@ -439,6 +473,9 @@ pub async fn execute_tool(
         "list_users" => exec_list_users(args, client).await,
         "list_reports" => exec_list_reports(args, client).await,
         "list_report_categories" => exec_list_report_categories(client).await,
+        "get_lookup_values" => exec_get_lookup_values(args, client).await,
+        "get_agent" => exec_get_agent(args, client).await,
+        "list_workflow_steps" => exec_list_workflow_steps(args, client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -855,6 +892,37 @@ async fn exec_list_reports(args: &Value, client: &HaloPSAClient) -> Result<Strin
 async fn exec_list_report_categories(client: &HaloPSAClient) -> Result<String, String> {
     let categories = client.list_report_categories().await?;
     Ok(serde_json::to_string_pretty(&json!({ "categories": categories })).unwrap())
+}
+
+async fn exec_get_lookup_values(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let lookupid = args
+        .get("lookupid")
+        .and_then(|v| v.as_i64())
+        .ok_or("lookupid is required")?;
+    let istree = args.get("istree").and_then(|v| v.as_bool()).unwrap_or(true);
+
+    let values = client.get_lookup_values(lookupid, istree).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "values": values })).unwrap())
+}
+
+async fn exec_get_agent(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let agent_id = args
+        .get("agent_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("agent_id is required")?;
+
+    let result = client.get_agent(agent_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_workflow_steps(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let workflow_id = args
+        .get("workflow_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("workflow_id is required")?;
+
+    let steps = client.list_workflow_steps(workflow_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "steps": steps })).unwrap())
 }
 
 async fn exec_run_report(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

@@ -456,10 +456,29 @@ impl HaloPSAClient {
     /// List report categories (groups) — confirmed against the agent UI as
     /// a generic lookup table (lookupid=41), not a Report-specific endpoint.
     pub async fn list_report_categories(&self) -> Result<Vec<Value>, String> {
+        self.get_lookup_values(41, true).await
+    }
+
+    /// Get values for any HaloPSA lookup table by ID. Generalizes the
+    /// lookupid=41 (report categories) pattern confirmed against the agent
+    /// UI — the same /api/Lookup endpoint serves other lookup tables too
+    /// (e.g. priorities, outcomes), keyed by a different lookupid per table.
+    pub async fn get_lookup_values(&self, lookupid: i64, istree: bool) -> Result<Vec<Value>, String> {
         let value = self
-            .get_raw("/api/Lookup", &[("lookupid", "41".into()), ("istree", "true".into())])
+            .get_raw(
+                "/api/Lookup",
+                &[("lookupid", lookupid.to_string()), ("istree", istree.to_string())],
+            )
             .await?;
         Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// List the steps (and their available transition actions) for a
+    /// workflow. Thin wrapper over the existing get_workflow — no new
+    /// endpoint, just exposing data we already fetch.
+    pub async fn list_workflow_steps(&self, workflow_id: i64) -> Result<Vec<WorkflowStep>, String> {
+        let workflow = self.get_workflow(workflow_id).await?;
+        Ok(workflow.steps)
     }
 
     /// Run a saved report by ID and return the full response, including
