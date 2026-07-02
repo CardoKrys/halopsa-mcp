@@ -404,6 +404,17 @@ pub fn tool_definitions() -> Vec<Value> {
                 "required": ["ticket_id"]
             }
         }),
+        json!({
+            "name": "get_asset",
+            "description": "Get full details of a single asset by ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "asset_id": { "type": "integer", "description": "The asset ID" }
+                },
+                "required": ["asset_id"]
+            }
+        }),
     ]
 }
 
@@ -476,6 +487,7 @@ pub async fn execute_tool(
         "get_lookup_values" => exec_get_lookup_values(args, client).await,
         "get_agent" => exec_get_agent(args, client).await,
         "list_workflow_steps" => exec_list_workflow_steps(args, client).await,
+        "get_asset" => exec_get_asset(args, client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -1016,6 +1028,16 @@ async fn exec_get_ticket_assets(args: &Value, client: &HaloPSAClient) -> Result<
         })
         .collect();
     Ok(serde_json::to_string_pretty(&json!({ "assets": summary })).unwrap())
+}
+
+async fn exec_get_asset(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let asset_id = args
+        .get("asset_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("asset_id is required")?;
+
+    let result = client.get_asset(asset_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_log_time(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

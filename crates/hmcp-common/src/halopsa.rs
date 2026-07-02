@@ -557,6 +557,15 @@ impl HaloPSAClient {
         Ok(parse_halo_list(value))
     }
 
+    /// Get a single asset by ID. Confirmed against the agent UI.
+    pub async fn get_asset(&self, asset_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Asset/{asset_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
     // --- Internal HTTP methods ---
 
     async fn get_raw(
