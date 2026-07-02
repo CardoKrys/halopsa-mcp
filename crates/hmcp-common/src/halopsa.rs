@@ -710,6 +710,31 @@ impl HaloPSAClient {
         .await
     }
 
+    /// List SLAs. Confirmed against the agent UI's own request.
+    pub async fn list_slas(&self) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw(
+                "/api/SLA",
+                &[
+                    ("showall", "true".into()),
+                    ("access_control_level", "2".into()),
+                    ("isconfig", "true".into()),
+                ],
+            )
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// Get a single SLA by ID, including its nested priority levels.
+    /// Confirmed against the agent UI's own request.
+    pub async fn get_sla(&self, sla_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/SLA/{sla_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
     // --- Internal HTTP methods ---
 
     async fn get_raw(

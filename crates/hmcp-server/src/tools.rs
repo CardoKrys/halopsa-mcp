@@ -558,6 +558,22 @@ pub fn tool_definitions() -> Vec<Value> {
                 "required": ["asset_group_id"]
             }
         }),
+        json!({
+            "name": "list_slas",
+            "description": "List all SLAs (service level agreements).",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "get_sla",
+            "description": "Get full details of a single SLA by ID, including its nested priority levels. Tickets are associated with an SLA, and priorities are defined per-SLA rather than globally.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sla_id": { "type": "integer", "description": "The SLA ID" }
+                },
+                "required": ["sla_id"]
+            }
+        }),
     ]
 }
 
@@ -642,6 +658,8 @@ pub async fn execute_tool(
         "list_agents" => exec_list_agents(args, client).await,
         "list_asset_groups" => exec_list_asset_groups(args, client).await,
         "get_asset_group" => exec_get_asset_group(args, client).await,
+        "list_slas" => exec_list_slas(client).await,
+        "get_sla" => exec_get_sla(args, client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -1390,6 +1408,21 @@ async fn exec_get_asset_group(args: &Value, client: &HaloPSAClient) -> Result<St
         .ok_or("asset_group_id is required")?;
 
     let result = client.get_asset_group(asset_group_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_slas(client: &HaloPSAClient) -> Result<String, String> {
+    let slas = client.list_slas().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "slas": slas })).unwrap())
+}
+
+async fn exec_get_sla(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let sla_id = args
+        .get("sla_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("sla_id is required")?;
+
+    let result = client.get_sla(sla_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
