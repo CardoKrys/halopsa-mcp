@@ -418,10 +418,11 @@ impl HaloPSAClient {
             params.push(("client_id", id.to_string()));
         }
         if let Some(s) = search {
-            // Still unconfirmed against the sandbox — mirrors the
-            // advanced_search fix confirmed for /api/Client, same
-            // underlying list mechanism, but never directly tested here.
-            params.push(("advanced_search", advanced_search_filter("name", s)));
+            // Confirmed against the agent UI's own search request: Users
+            // uses a plain search param, unlike Clients' advanced_search —
+            // each HaloPSA list endpoint has its own convention, don't
+            // assume one carries over to another.
+            params.push(("search", s.to_string()));
         }
         let value = self.get_raw("/api/Users", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
