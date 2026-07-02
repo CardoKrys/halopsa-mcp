@@ -374,6 +374,50 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "list_software_licences",
+            "description": "List software licence records (e.g. Microsoft 365, Office 365) with seat counts and assigned client. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-200, default 50)", "default": 50 },
+                    "client_id": { "type": "integer", "description": "Filter by client ID (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "get_software_licence",
+            "description": "Get full details of a single software licence by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "licence_id": { "type": "integer", "description": "The software licence ID" }
+                },
+                "required": ["licence_id"]
+            }
+        }),
+        json!({
+            "name": "list_charge_rates",
+            "description": "List all charge rates (hourly billing rates) defined in HaloPSA. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "get_system_info",
+            "description": "Get HaloPSA instance/system metadata (version, tenant, service URLs). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "list_billing_lines",
+            "description": "List individual billing line items (flattened from invoices). Returns paginated results. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
             "name": "list_teams",
             "description": "List all teams/queues the user has access to.",
             "inputSchema": { "type": "object", "properties": {} }
@@ -821,6 +865,11 @@ pub async fn execute_tool(
         "get_status_details" => exec_get_status_details(args, client).await,
         "global_search" => exec_global_search(args, client).await,
         "list_field_groups" => exec_list_field_groups(client).await,
+        "list_software_licences" => exec_list_software_licences(args, client).await,
+        "get_software_licence" => exec_get_software_licence(args, client).await,
+        "list_charge_rates" => exec_list_charge_rates(client).await,
+        "get_system_info" => exec_get_system_info(client).await,
+        "list_billing_lines" => exec_list_billing_lines(args, client).await,
         "list_invoices" => exec_list_invoices(args, client).await,
         "list_recurring_invoices" => exec_list_recurring_invoices(args, client).await,
         "get_recurring_invoice" => exec_get_recurring_invoice(args, client).await,
@@ -1320,6 +1369,57 @@ async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<Stri
 async fn exec_list_field_groups(client: &HaloPSAClient) -> Result<String, String> {
     let groups = client.list_field_groups().await?;
     Ok(serde_json::to_string_pretty(&json!({ "field_groups": groups })).unwrap())
+}
+
+async fn exec_list_software_licences(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let client_id = args.get("client_id").and_then(|v| v.as_i64());
+
+    let (licences, total) = client.list_software_licences(page, page_size, client_id).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "licences": licences,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_get_software_licence(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let licence_id = args
+        .get("licence_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("licence_id is required")?;
+
+    let result = client.get_software_licence(licence_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_charge_rates(client: &HaloPSAClient) -> Result<String, String> {
+    let rates = client.list_charge_rates().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "charge_rates": rates })).unwrap())
+}
+
+async fn exec_get_system_info(client: &HaloPSAClient) -> Result<String, String> {
+    let info = client.get_system_info().await?;
+    Ok(serde_json::to_string_pretty(&info).unwrap())
+}
+
+async fn exec_list_billing_lines(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (lines, total) = client.list_billing_lines(page, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "billing_lines": lines,
+        "invoice_total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
 }
 
 async fn exec_list_invoices(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

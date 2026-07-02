@@ -483,6 +483,89 @@ impl HaloPSAClient {
         .await
     }
 
+    /// List software licences. Endpoint path follows HaloPSA's singular
+    /// resource-name convention — NOT confirmed against a real capture
+    /// (reverse-engineered from a third-party HaloPSA MCP connector's
+    /// output shape against production Halo), flag for retest.
+    pub async fn list_software_licences(
+        &self,
+        page: i64,
+        page_size: i64,
+        client_id: Option<i64>,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(200).to_string()),
+        ];
+        if let Some(id) = client_id {
+            params.push(("client_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Licence", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    /// Get a single software licence by ID. Same endpoint-guess caveat as
+    /// list_software_licences.
+    pub async fn get_software_licence(&self, licence_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Licence/{licence_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    /// List charge rates. Endpoint path guessed from HaloPSA's naming
+    /// convention — NOT confirmed against a real capture, flag for retest.
+    pub async fn list_charge_rates(&self) -> Result<Vec<Value>, String> {
+        let value = self.get_no_params("/api/ChargeRate").await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// Get HaloPSA instance/system metadata (version, tenant, service
+    /// URLs). Endpoint path guessed — NOT confirmed against a real
+    /// capture, flag for retest.
+    pub async fn get_system_info(&self) -> Result<Value, String> {
+        self.get_no_params("/api/SystemInfo").await
+    }
+
+    /// List billing lines. HaloPSA has no dedicated billing-lines
+    /// endpoint we could confirm — this flattens the `lines` array out of
+    /// the invoice list (`/api/Invoice?includelines=true`), the same data
+    /// a third-party HaloPSA connector's "billing lines" tool turned out
+    /// to be reading from. `includelines` on `/api/Invoice` is itself
+    /// unconfirmed, flag for retest.
+    pub async fn list_billing_lines(
+        &self,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+            ("includeinvoices", "true".into()),
+            ("includecredits", "false".into()),
+            ("includepoinvoices", "false".into()),
+            ("includelines", "true".into()),
+        ];
+        let value = self.get_raw("/api/Invoice", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let invoices = parse_halo_list::<Value>(value);
+        let lines: Vec<Value> = invoices
+            .iter()
+            .flat_map(|inv| {
+                inv.get("lines")
+                    .and_then(|l| l.as_array())
+                    .cloned()
+                    .unwrap_or_default()
+            })
+            .collect();
+        Ok((lines, record_count))
+    }
+
     /// List teams/queues.
     pub async fn list_teams(&self) -> Result<Vec<Value>, String> {
         let value = self.get_no_params("/api/Team").await?;
