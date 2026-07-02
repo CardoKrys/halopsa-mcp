@@ -132,6 +132,14 @@ impl HaloPSAClient {
         if filters.open_only {
             params.push(("open_only", "true".into()));
         }
+        if let Some(ref priority) = filters.priority {
+            // Confirmed against the agent UI: /api/Tickets supports the
+            // same advanced_search mechanism as Clients — priority is
+            // filtered by label (e.g. "P3", "High"), not a numeric ID.
+            // Priority labels are environment-specific (Sandbox uses
+            // P1-P5, Production uses named levels like High/Critical/RFO).
+            params.push(("advanced_search", advanced_search_filter("priority", priority)));
+        }
 
         let value = self
             .get_raw("/api/Tickets", &params)
@@ -876,6 +884,7 @@ pub struct TicketFilter {
     pub status_id: Option<i64>,
     pub tickettype_id: Option<i64>,
     pub open_only: bool,
+    pub priority: Option<String>,
 }
 
 // --- OAuth token management for service account ---

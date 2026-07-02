@@ -21,7 +21,8 @@ pub fn tool_definitions() -> Vec<Value> {
                     "client_id": { "type": "integer", "description": "Filter by client ID" },
                     "status_id": { "type": "integer", "description": "Filter by status ID" },
                     "tickettype_id": { "type": "integer", "description": "Filter by ticket type ID" },
-                    "open_only": { "type": "boolean", "description": "Only return open tickets (default false)", "default": false }
+                    "open_only": { "type": "boolean", "description": "Only return open tickets (default false)", "default": false },
+                    "priority": { "type": "string", "description": "Filter by priority label (e.g. \"P3\", \"High\"). Priority labels are environment-specific — Sandbox uses P1-P5, Production uses named levels like High/Critical/RFO. Use list_statuses or check a real ticket to find valid labels for this instance." }
                 }
             }
         }),
@@ -112,6 +113,17 @@ pub fn tool_definitions() -> Vec<Value> {
                     "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
                 },
                 "required": ["client_id"]
+            }
+        }),
+        json!({
+            "name": "list_high_priority_tickets",
+            "description": "List tickets at or above a set of priority labels (defaults to Production's High/Critical/RFO — override priority_labels for other environments, e.g. Sandbox uses P1-P5 labels instead). Queries each label separately and merges results, since only single-label filtering per call is confirmed.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "priority_labels": { "type": "array", "items": { "type": "string" }, "description": "Priority labels to include (default [\"High\", \"Critical\", \"RFO\"] — Production only, won't match in Sandbox)" },
+                    "page_size": { "type": "integer", "description": "Max results per priority label before merging (default 50)", "default": 50 }
+                }
             }
         }),
         json!({
@@ -692,6 +704,7 @@ pub async fn execute_tool(
         "search_tickets" => exec_search_tickets(args, client).await,
         "list_open_tickets" => exec_list_open_tickets(args, client).await,
         "list_tickets_by_client" => exec_list_tickets_by_client(args, client).await,
+        "list_high_priority_tickets" => exec_list_high_priority_tickets(args, client).await,
         "list_unassigned_tickets" => exec_list_unassigned_tickets(args, client).await,
         "list_my_tickets" => exec_list_my_tickets(args, client).await,
         "list_actions" | "list_ticket_actions" => exec_list_actions(args, client).await,
@@ -784,6 +797,7 @@ async fn exec_list_tickets(args: &Value, client: &HaloPSAClient) -> Result<Strin
         status_id: args.get("status_id").and_then(|v| v.as_i64()),
         tickettype_id: args.get("tickettype_id").and_then(|v| v.as_i64()),
         open_only: args.get("open_only").and_then(|v| v.as_bool()).unwrap_or(false),
+        priority: args.get("priority").and_then(|v| v.as_str()).map(String::from),
     };
 
     let (tickets, total) = client.list_tickets(page, page_size, &filter).await?;
@@ -835,6 +849,46 @@ async fn exec_list_tickets_by_client(args: &Value, client: &HaloPSAClient) -> Re
         "total_count": total,
         "page": page,
         "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_high_priority_tickets(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let labels: Vec<String> = args
+        .get("priority_labels")
+        .and_then(|v| v.as_array())
+        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(String::from)).collect())
+        .unwrap_or_else(|| vec!["High".into(), "Critical".into(), "RFO".into()]);
+
+    // Only single-label filtering per call is confirmed — query each
+    // label separately and merge/dedupe by id rather than guessing at
+    // OR-across-values semantics within one advanced_search call.
+    let mut seen = std::collections::HashSet::new();
+    let mut merged: Vec<Value> = Vec::new();
+    let mut total = 0i64;
+    for label in &labels {
+        let filter = TicketFilter {
+            priority: Some(label.clone()),
+            ..Default::default()
+        };
+        let (tickets, count) = client.list_tickets(1, page_size, &filter).await?;
+        total += count;
+        for t in tickets {
+            if let Some(id) = t.get("id").and_then(|v| v.as_i64()) {
+                if seen.insert(id) {
+                    merged.push(t);
+                }
+            }
+        }
+    }
+    merged.truncate(page_size.max(1) as usize);
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "tickets": summarize_tickets(&merged),
+        "total_count": total,
+        "priority_labels": labels,
+        "note": "total_count is the sum across each priority label's own count, not deduplicated; tickets array is deduplicated and truncated to page_size",
     }))
     .unwrap())
 }
