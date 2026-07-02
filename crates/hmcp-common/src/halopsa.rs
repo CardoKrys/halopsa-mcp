@@ -517,10 +517,17 @@ impl HaloPSAClient {
         .await
     }
 
-    /// List charge rates. Endpoint path guessed from HaloPSA's naming
-    /// convention — NOT confirmed against a real capture, flag for retest.
+    /// List charge types (Configuration > Billing > Charge Types, selected
+    /// when billing ticket actions). Confirmed against the agent UI's own
+    /// request — a Lookup table (id 17), not a dedicated ChargeRate
+    /// endpoint as originally guessed from the StackJack reference.
     pub async fn list_charge_rates(&self) -> Result<Vec<Value>, String> {
-        let value = self.get_no_params("/api/ChargeRate").await?;
+        let value = self
+            .get_raw(
+                "/api/Lookup",
+                &[("lookupid", "17".into()), ("showallcodes", "true".into())],
+            )
+            .await?;
         Ok(parse_halo_list::<Value>(value))
     }
 

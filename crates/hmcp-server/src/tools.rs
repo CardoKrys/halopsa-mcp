@@ -398,7 +398,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_charge_rates",
-            "description": "List all charge rates (hourly billing rates) defined in HaloPSA. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "List charge types (Configuration > Billing > Charge Types) used to categorize billable ticket actions, e.g. 'SD - Remote Reactive Support', 'FIELD - Travel'.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
