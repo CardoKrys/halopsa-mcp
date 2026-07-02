@@ -336,6 +336,11 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "list_field_groups",
+            "description": "List custom field groups (collections of custom fields attached to request forms, e.g. 'Laptop Request', 'Leaver Details').",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
             "name": "list_teams",
             "description": "List all teams/queues the user has access to.",
             "inputSchema": { "type": "object", "properties": {} }
@@ -782,6 +787,7 @@ pub async fn execute_tool(
         "list_statuses" => exec_list_statuses(args, client).await,
         "get_status_details" => exec_get_status_details(args, client).await,
         "global_search" => exec_global_search(args, client).await,
+        "list_field_groups" => exec_list_field_groups(client).await,
         "list_teams" => exec_list_teams(client).await,
         "list_ticket_types" => exec_list_ticket_types(client).await,
         "get_client" => exec_get_client(args, client).await,
@@ -1273,6 +1279,11 @@ async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<Stri
 
     let result = client.global_search(query, count_per_entity).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_field_groups(client: &HaloPSAClient) -> Result<String, String> {
+    let groups = client.list_field_groups().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "field_groups": groups })).unwrap())
 }
 
 async fn exec_list_teams(client: &HaloPSAClient) -> Result<String, String> {

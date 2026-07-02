@@ -418,6 +418,23 @@ impl HaloPSAClient {
         .await
     }
 
+    /// List custom field groups (collections of custom fields attached to
+    /// request forms, e.g. "Laptop Request", "Leaver Details"). Confirmed
+    /// against the agent UI's own request.
+    pub async fn list_field_groups(&self) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw(
+                "/api/FieldGroup",
+                &[
+                    ("showall", "true".into()),
+                    ("access_control_level", "2".into()),
+                    ("isconfig", "true".into()),
+                ],
+            )
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
     /// List teams/queues.
     pub async fn list_teams(&self) -> Result<Vec<Value>, String> {
         let value = self.get_no_params("/api/Team").await?;
