@@ -308,6 +308,18 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "list_reports",
+            "description": "List saved report definitions with optional keyword search. Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 },
+                    "search": { "type": "string", "description": "Keyword search across report name" }
+                }
+            }
+        }),
+        json!({
             "name": "get_me",
             "description": "Get information about the authenticated user (agent).",
             "inputSchema": { "type": "object", "properties": {} }
@@ -390,6 +402,7 @@ pub async fn execute_tool(
         "list_clients" => exec_list_clients(args, client).await,
         "search_clients" => exec_search_clients(args, client).await,
         "list_users" => exec_list_users(args, client).await,
+        "list_reports" => exec_list_reports(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
         "semantic_search" => {
@@ -777,6 +790,22 @@ async fn exec_list_users(args: &Value, client: &HaloPSAClient) -> Result<String,
 
     Ok(serde_json::to_string_pretty(&json!({
         "users": users,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_reports(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let search = args.get("search").and_then(|v| v.as_str());
+
+    let (reports, total) = client.list_reports(page, page_size, search).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "reports": reports,
         "total_count": total,
         "page": page,
         "page_size": page_size,

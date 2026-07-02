@@ -420,6 +420,27 @@ impl HaloPSAClient {
         Ok((records, record_count))
     }
 
+    /// List saved report definitions with optional keyword search.
+    pub async fn list_reports(
+        &self,
+        page: i64,
+        page_size: i64,
+        search: Option<&str>,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(s) = search {
+            params.push(("advanced_search", advanced_search_filter("name", s)));
+        }
+        let value = self.get_raw("/api/Report", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
     /// List ticket types.
     pub async fn list_ticket_types(&self) -> Result<Vec<Value>, String> {
         let value = self.get_no_params("/api/TicketType").await?;
