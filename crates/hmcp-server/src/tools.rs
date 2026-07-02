@@ -115,6 +115,17 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "list_unassigned_tickets",
+            "description": "List tickets with no agent assigned. Confirmed against the agent UI: unassigned tickets are represented by a reserved placeholder agent_id, not a null/missing value.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
             "name": "list_my_tickets",
             "description": "List tickets assigned to the authenticated agent. Resolves your own agent ID via get_me (best-effort — if identity resolution fails, this will error; fall back to list_tickets with an explicit agent_id in that case).",
             "inputSchema": {
@@ -681,6 +692,7 @@ pub async fn execute_tool(
         "search_tickets" => exec_search_tickets(args, client).await,
         "list_open_tickets" => exec_list_open_tickets(args, client).await,
         "list_tickets_by_client" => exec_list_tickets_by_client(args, client).await,
+        "list_unassigned_tickets" => exec_list_unassigned_tickets(args, client).await,
         "list_my_tickets" => exec_list_my_tickets(args, client).await,
         "list_actions" | "list_ticket_actions" => exec_list_actions(args, client).await,
         "add_action" => exec_add_action(args, client).await,
@@ -814,6 +826,27 @@ async fn exec_list_tickets_by_client(args: &Value, client: &HaloPSAClient) -> Re
 
     let filter = TicketFilter {
         client_id: Some(client_id),
+        ..Default::default()
+    };
+    let (tickets, total) = client.list_tickets(page, page_size, &filter).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "tickets": summarize_tickets(&tickets),
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_unassigned_tickets(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    // Confirmed against the agent UI: unassigned tickets are represented
+    // by a reserved placeholder agent_id=1, not a null/missing value.
+    let filter = TicketFilter {
+        agent_id: Some(1),
         ..Default::default()
     };
     let (tickets, total) = client.list_tickets(page, page_size, &filter).await?;
