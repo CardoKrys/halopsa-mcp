@@ -441,6 +441,28 @@ impl HaloPSAClient {
         Ok((records, record_count))
     }
 
+    /// Run a saved report by ID and return the full response, including
+    /// the executed rows under `report.rows`. `extra_params` carries
+    /// report-specific filters (e.g. a report might take "clientname") —
+    /// these vary per report, confirmed against a real report execution
+    /// in the agent UI, so they're passed through generically rather than
+    /// hardcoded.
+    pub async fn run_report(
+        &self,
+        report_id: i64,
+        extra_params: &[(String, String)],
+    ) -> Result<Value, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("includedetails", "true".into()),
+            ("loadreport", "true".into()),
+            ("dontloadsystemreport", "false".into()),
+        ];
+        for (k, v) in extra_params {
+            params.push((k.as_str(), v.clone()));
+        }
+        self.get_raw(&format!("/api/Report/{report_id}"), &params).await
+    }
+
     /// List ticket types.
     pub async fn list_ticket_types(&self) -> Result<Vec<Value>, String> {
         let value = self.get_no_params("/api/TicketType").await?;

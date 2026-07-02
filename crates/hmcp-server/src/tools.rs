@@ -320,6 +320,22 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "run_report",
+            "description": "Run a saved HaloPSA report by ID and return its result rows. Use list_reports to find report IDs.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "report_id": { "type": "integer", "description": "The report ID (from list_reports)" },
+                    "parameters": {
+                        "type": "object",
+                        "description": "Optional report-specific filter parameters as key-value pairs (varies per report — e.g. some reports take a 'clientname' filter)",
+                        "additionalProperties": { "type": "string" }
+                    }
+                },
+                "required": ["report_id"]
+            }
+        }),
+        json!({
             "name": "get_me",
             "description": "Get information about the authenticated user (agent).",
             "inputSchema": { "type": "object", "properties": {} }
@@ -403,6 +419,7 @@ pub async fn execute_tool(
         "search_clients" => exec_search_clients(args, client).await,
         "list_users" => exec_list_users(args, client).await,
         "list_reports" => exec_list_reports(args, client).await,
+        "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
         "semantic_search" => {
@@ -809,6 +826,43 @@ async fn exec_list_reports(args: &Value, client: &HaloPSAClient) -> Result<Strin
         "total_count": total,
         "page": page,
         "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_run_report(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let report_id = args
+        .get("report_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("report_id is required")?;
+
+    let mut params: Vec<(String, String)> = Vec::new();
+    if let Some(obj) = args.get("parameters").and_then(|v| v.as_object()) {
+        for (k, v) in obj {
+            let val = match v {
+                Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            params.push((k.clone(), val));
+        }
+    }
+
+    let result = client.run_report(report_id, &params).await?;
+
+    let rows = result
+        .get("report")
+        .and_then(|r| r.get("rows"))
+        .cloned()
+        .unwrap_or_else(|| json!([]));
+    let row_count = rows.as_array().map(|a| a.len()).unwrap_or(0);
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "report_id": report_id,
+        "name": result.get("name"),
+        "columns": result.get("available_columns"),
+        "applied_filters": result.get("filters"),
+        "row_count": row_count,
+        "rows": rows,
     }))
     .unwrap())
 }
