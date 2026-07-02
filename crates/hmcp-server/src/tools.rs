@@ -323,6 +323,28 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "get_ticket_type_details",
+            "description": "Get full configuration details for a single ticket type, including its workflow, categories, and other settings.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "tickettype_id": { "type": "integer", "description": "The ticket type ID (from list_ticket_types)" }
+                },
+                "required": ["tickettype_id"]
+            }
+        }),
+        json!({
+            "name": "list_ticket_type_fields",
+            "description": "List the fields configured for a ticket type (e.g. Summary, Category, Priority, plus any custom fields).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "tickettype_id": { "type": "integer", "description": "The ticket type ID (from list_ticket_types)" }
+                },
+                "required": ["tickettype_id"]
+            }
+        }),
+        json!({
             "name": "get_client",
             "description": "Get details about a specific client by ID.",
             "inputSchema": {
@@ -433,6 +455,11 @@ pub fn tool_definitions() -> Vec<Value> {
                 },
                 "required": ["agent_id"]
             }
+        }),
+        json!({
+            "name": "list_ticket_areas",
+            "description": "List ticket areas (e.g. Service Desk, Projects, Internal Processes) — the area a ticket belongs to.",
+            "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
             "name": "list_workflow_steps",
@@ -742,6 +769,9 @@ pub async fn execute_tool(
         "list_report_categories" => exec_list_report_categories(client).await,
         "get_lookup_values" => exec_get_lookup_values(args, client).await,
         "get_agent" => exec_get_agent(args, client).await,
+        "list_ticket_areas" => exec_list_ticket_areas(client).await,
+        "get_ticket_type_details" => exec_get_ticket_type_details(args, client).await,
+        "list_ticket_type_fields" => exec_list_ticket_type_fields(args, client).await,
         "list_workflow_steps" => exec_list_workflow_steps(args, client).await,
         "get_asset" => exec_get_asset(args, client).await,
         "list_assets" => exec_list_assets(args, client).await,
@@ -1357,6 +1387,31 @@ async fn exec_get_agent(args: &Value, client: &HaloPSAClient) -> Result<String, 
 
     let result = client.get_agent(agent_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_ticket_areas(client: &HaloPSAClient) -> Result<String, String> {
+    let areas = client.list_ticket_areas().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "areas": areas })).unwrap())
+}
+
+async fn exec_get_ticket_type_details(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let tickettype_id = args
+        .get("tickettype_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("tickettype_id is required")?;
+
+    let result = client.get_ticket_type(tickettype_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_ticket_type_fields(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let tickettype_id = args
+        .get("tickettype_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("tickettype_id is required")?;
+
+    let fields = client.list_ticket_type_fields(tickettype_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "fields": fields })).unwrap())
 }
 
 async fn exec_list_workflow_steps(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

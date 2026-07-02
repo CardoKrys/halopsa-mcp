@@ -304,8 +304,39 @@ impl HaloPSAClient {
     }
 
     /// Get ticket type by ID (includes workflow definition if present).
+    /// Confirmed against the agent UI's own request — includedetails,
+    /// isrtconfig and includeconfig together return the full config
+    /// (including the field list shown on the "Field List" tab, which
+    /// fires no separate API call of its own — it's rendered client-side
+    /// from this same response).
     pub async fn get_ticket_type(&self, type_id: i64) -> Result<Value, String> {
-        self.get_no_params(&format!("/api/TicketType/{type_id}")).await
+        self.get_raw(
+            &format!("/api/TicketType/{type_id}"),
+            &[
+                ("includedetails", "true".into()),
+                ("isrtconfig", "true".into()),
+                ("includeconfig", "true".into()),
+            ],
+        )
+        .await
+    }
+
+    /// List the fields configured for a ticket type (the "Field List" tab
+    /// in the agent UI). The exact JSON field name wrapping this array in
+    /// the ticket type response is NOT confirmed — same caveat as
+    /// list_priorities. Tries the likely "fields" key first, falling back
+    /// to the first array field found.
+    pub async fn list_ticket_type_fields(&self, type_id: i64) -> Result<Vec<Value>, String> {
+        let tt = self.get_ticket_type(type_id).await?;
+        if let Some(arr) = tt.get("fields").and_then(|v| v.as_array()) {
+            return Ok(arr.clone());
+        }
+        if let Some(obj) = tt.as_object() {
+            if let Some(arr) = obj.values().find_map(|v| v.as_array()) {
+                return Ok(arr.clone());
+            }
+        }
+        Ok(Vec::new())
     }
 
     /// Get available workflow actions for a ticket's current step.
@@ -507,6 +538,15 @@ impl HaloPSAClient {
                 "/api/Lookup",
                 &[("lookupid", lookupid.to_string()), ("istree", istree.to_string())],
             )
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// List ticket areas (e.g. Service Desk, Projects, Internal Processes).
+    /// Confirmed against the agent UI's own request.
+    pub async fn list_ticket_areas(&self) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw("/api/TicketArea", &[("showall", "true".into()), ("location", "0".into())])
             .await?;
         Ok(parse_halo_list::<Value>(value))
     }
