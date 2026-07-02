@@ -618,6 +618,35 @@ impl HaloPSAClient {
         Ok((records, record_count))
     }
 
+    /// Get a single site by ID. Confirmed against the agent UI.
+    pub async fn get_site(&self, site_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Site/{site_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    /// Create a new site. `issitedetails: true` is required — confirmed
+    /// against the agent UI, Site writes need it to indicate this payload
+    /// is the site-details form (Halo entities can have multiple detail
+    /// sub-forms on the same base object).
+    pub async fn create_site(&self, mut site: Value) -> Result<Value, String> {
+        if let Some(obj) = site.as_object_mut() {
+            obj.insert("issitedetails".into(), json!(true));
+        }
+        self.post("/api/Site", &json!([site])).await
+    }
+
+    /// Update an existing site. Same issitedetails requirement as create.
+    pub async fn update_site(&self, site_id: i64, mut fields: Value) -> Result<Value, String> {
+        if let Some(obj) = fields.as_object_mut() {
+            obj.insert("id".into(), json!(site_id));
+            obj.insert("issitedetails".into(), json!(true));
+        }
+        self.post("/api/Site", &json!([fields])).await
+    }
+
     // --- Internal HTTP methods ---
 
     async fn get_raw(

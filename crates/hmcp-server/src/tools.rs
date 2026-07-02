@@ -451,6 +451,57 @@ pub fn tool_definitions() -> Vec<Value> {
                 }
             }
         }),
+        json!({
+            "name": "get_site",
+            "description": "Get full details of a single site by ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "site_id": { "type": "integer", "description": "The site ID" }
+                },
+                "required": ["site_id"]
+            }
+        }),
+        json!({
+            "name": "create_site",
+            "description": "Create a new site for a client.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "client_id": { "type": "integer", "description": "The client this site belongs to" },
+                    "name": { "type": "string", "description": "Site name" },
+                    "address_line1": { "type": "string", "description": "Address line 1" },
+                    "address_line2": { "type": "string", "description": "Address line 2" },
+                    "address_line3": { "type": "string", "description": "Address line 3" },
+                    "address_line4": { "type": "string", "description": "Address line 4" },
+                    "address_postcode": { "type": "string", "description": "Postcode" },
+                    "sla_id": { "type": "integer", "description": "SLA ID to apply to this site" },
+                    "timezone": { "type": "string", "description": "Timezone name" },
+                    "inactive": { "type": "boolean", "description": "Mark as inactive (default false)" }
+                },
+                "required": ["client_id", "name"]
+            }
+        }),
+        json!({
+            "name": "update_site",
+            "description": "Update fields on an existing site. Only provided fields are changed.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "site_id": { "type": "integer", "description": "The site ID to update" },
+                    "name": { "type": "string", "description": "New site name" },
+                    "address_line1": { "type": "string", "description": "Address line 1" },
+                    "address_line2": { "type": "string", "description": "Address line 2" },
+                    "address_line3": { "type": "string", "description": "Address line 3" },
+                    "address_line4": { "type": "string", "description": "Address line 4" },
+                    "address_postcode": { "type": "string", "description": "Postcode" },
+                    "sla_id": { "type": "integer", "description": "SLA ID to apply to this site" },
+                    "timezone": { "type": "string", "description": "Timezone name" },
+                    "inactive": { "type": "boolean", "description": "Mark as inactive/active" }
+                },
+                "required": ["site_id"]
+            }
+        }),
     ]
 }
 
@@ -527,6 +578,9 @@ pub async fn execute_tool(
         "list_assets" => exec_list_assets(args, client).await,
         "search_assets" => exec_search_assets(args, client).await,
         "list_sites" => exec_list_sites(args, client).await,
+        "get_site" => exec_get_site(args, client).await,
+        "create_site" => exec_create_site(args, client).await,
+        "update_site" => exec_update_site(args, client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -1131,6 +1185,82 @@ async fn exec_list_sites(args: &Value, client: &HaloPSAClient) -> Result<String,
         "page_size": page_size,
     }))
     .unwrap())
+}
+
+async fn exec_get_site(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let site_id = args
+        .get("site_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("site_id is required")?;
+
+    let result = client.get_site(site_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+fn build_site_address(args: &Value) -> Option<Value> {
+    let mapping = [
+        ("address_line1", "line1"),
+        ("address_line2", "line2"),
+        ("address_line3", "line3"),
+        ("address_line4", "line4"),
+        ("address_postcode", "postcode"),
+    ];
+    let mut addr = json!({});
+    let mut any = false;
+    for (arg_key, halo_key) in mapping {
+        if let Some(val) = args.get(arg_key) {
+            addr[halo_key] = val.clone();
+            any = true;
+        }
+    }
+    if any { Some(addr) } else { None }
+}
+
+async fn exec_create_site(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let client_id = args
+        .get("client_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("client_id is required")?;
+    let name = args
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or("name is required")?;
+
+    let mut site = json!({
+        "client_id": client_id,
+        "name": name,
+    });
+    for field in &["sla_id", "timezone", "inactive"] {
+        if let Some(val) = args.get(*field) {
+            site[*field] = val.clone();
+        }
+    }
+    if let Some(addr) = build_site_address(args) {
+        site["delivery_address"] = addr;
+    }
+
+    let result = client.create_site(site).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_site(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let site_id = args
+        .get("site_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("site_id is required")?;
+
+    let mut fields = json!({});
+    for field in &["name", "sla_id", "timezone", "inactive"] {
+        if let Some(val) = args.get(*field) {
+            fields[*field] = val.clone();
+        }
+    }
+    if let Some(addr) = build_site_address(args) {
+        fields["delivery_address"] = addr;
+    }
+
+    let result = client.update_site(site_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_log_time(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
