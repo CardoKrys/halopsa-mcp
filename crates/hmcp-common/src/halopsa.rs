@@ -394,6 +394,30 @@ impl HaloPSAClient {
         Ok(parse_halo_list::<Value>(value))
     }
 
+    /// Get full configuration details for a single status (SLA hold
+    /// behavior, email settings, colour, etc). Confirmed against the
+    /// agent UI's own request.
+    pub async fn get_status_details(&self, status_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Status/{status_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    /// Cross-entity search (tickets, clients, users, assets, etc. in one
+    /// call). Confirmed against the agent UI's own global search box.
+    pub async fn global_search(&self, query: &str, count_per_entity: i64) -> Result<Value, String> {
+        self.get_raw(
+            "/api/Search",
+            &[
+                ("search", query.to_string()),
+                ("count_per_entity", count_per_entity.to_string()),
+            ],
+        )
+        .await
+    }
+
     /// List teams/queues.
     pub async fn list_teams(&self) -> Result<Vec<Value>, String> {
         let value = self.get_no_params("/api/Team").await?;

@@ -313,6 +313,29 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "get_status_details",
+            "description": "Get full configuration details for a single status (SLA hold behavior, email settings, colour, etc). Use list_statuses to find status IDs.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "status_id": { "type": "integer", "description": "The status ID" }
+                },
+                "required": ["status_id"]
+            }
+        }),
+        json!({
+            "name": "global_search",
+            "description": "Search across all entity types at once (tickets, clients, users, assets, etc). Good for a broad first look when you don't know what kind of record you're looking for.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Search query" },
+                    "count_per_entity": { "type": "integer", "description": "Max results per entity type (default 3)", "default": 3 }
+                },
+                "required": ["query"]
+            }
+        }),
+        json!({
             "name": "list_teams",
             "description": "List all teams/queues the user has access to.",
             "inputSchema": { "type": "object", "properties": {} }
@@ -757,6 +780,8 @@ pub async fn execute_tool(
         "get_available_actions" => exec_get_available_actions(args, client).await,
         "execute_workflow_action" => exec_execute_workflow_action(args, client).await,
         "list_statuses" => exec_list_statuses(args, client).await,
+        "get_status_details" => exec_get_status_details(args, client).await,
+        "global_search" => exec_global_search(args, client).await,
         "list_teams" => exec_list_teams(client).await,
         "list_ticket_types" => exec_list_ticket_types(client).await,
         "get_client" => exec_get_client(args, client).await,
@@ -1224,6 +1249,30 @@ async fn exec_list_statuses(args: &Value, client: &HaloPSAClient) -> Result<Stri
         })
         .collect();
     Ok(serde_json::to_string_pretty(&json!({ "statuses": summary })).unwrap())
+}
+
+async fn exec_get_status_details(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let status_id = args
+        .get("status_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("status_id is required")?;
+
+    let result = client.get_status_details(status_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let query = args
+        .get("query")
+        .and_then(|v| v.as_str())
+        .ok_or("query is required")?;
+    let count_per_entity = args
+        .get("count_per_entity")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(3);
+
+    let result = client.global_search(query, count_per_entity).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_list_teams(client: &HaloPSAClient) -> Result<String, String> {
