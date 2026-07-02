@@ -140,6 +140,16 @@ impl HaloPSAClient {
             // P1-P5, Production uses named levels like High/Critical/RFO).
             params.push(("advanced_search", advanced_search_filter("priority", priority)));
         }
+        if let Some(id) = filters.ticketarea_id {
+            // Confirmed against the agent UI's own request (Projects nav
+            // is literally /api/Tickets?ticketarea_id=<Projects area id>).
+            params.push(("ticketarea_id", id.to_string()));
+        }
+        if let Some(id) = filters.parent_id {
+            // Parent/child ticket relationship field name unconfirmed
+            // against a real capture — flag for retest.
+            params.push(("parent_id", id.to_string()));
+        }
 
         let value = self
             .get_raw("/api/Tickets", &params)
@@ -571,6 +581,286 @@ impl HaloPSAClient {
             })
             .collect();
         Ok((lines, record_count))
+    }
+
+    /// Resolve the "Projects" ticket area ID (case-insensitive name
+    /// match), used by list_projects/create_project.
+    async fn resolve_projects_area_id(&self) -> Result<i64, String> {
+        let areas = self.list_ticket_areas().await?;
+        areas
+            .iter()
+            .find(|a| {
+                a.get("name")
+                    .and_then(|n| n.as_str())
+                    .map(|n| n.eq_ignore_ascii_case("projects"))
+                    .unwrap_or(false)
+            })
+            .and_then(|a| a.get("id").and_then(|v| v.as_i64()))
+            .ok_or_else(|| "Could not find a ticket area named 'Projects'".to_string())
+    }
+
+    /// List projects. Confirmed against the agent UI's own request —
+    /// Projects are Tickets scoped to the "Projects" ticket area, not a
+    /// separate resource.
+    pub async fn list_projects(
+        &self,
+        page: i64,
+        page_size: i64,
+        client_id: Option<i64>,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let area_id = self.resolve_projects_area_id().await?;
+        let filters = TicketFilter {
+            ticketarea_id: Some(area_id),
+            client_id,
+            ..Default::default()
+        };
+        self.list_tickets(page, page_size, &filters).await
+    }
+
+    /// Get a single project by ID. Thin wrapper over get_ticket — a
+    /// project is just a Ticket scoped to the Projects ticket area.
+    pub async fn get_project(&self, project_id: i64) -> Result<Value, String> {
+        self.get_ticket(project_id).await
+    }
+
+    /// Create a new project. Caller should still supply an appropriate
+    /// tickettype_id (use list_ticket_types to find the Project-designated
+    /// type) — this wasn't captured from a real "+New Project" form, only
+    /// the ticketarea_id is auto-filled and confirmed.
+    pub async fn create_project(&self, mut ticket: Value) -> Result<Value, String> {
+        let area_id = self.resolve_projects_area_id().await?;
+        if let Some(obj) = ticket.as_object_mut() {
+            obj.entry("ticketarea_id").or_insert(json!(area_id));
+        }
+        self.create_ticket(ticket).await
+    }
+
+    /// Update an existing project. Thin wrapper over update_ticket.
+    pub async fn update_project(&self, project_id: i64, fields: Value) -> Result<Value, String> {
+        self.update_ticket(project_id, fields).await
+    }
+
+    /// List tasks (child tickets) under a project. Parent/child field name
+    /// unconfirmed against a real capture — flag for retest.
+    pub async fn list_project_tasks(
+        &self,
+        project_id: i64,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let filters = TicketFilter {
+            parent_id: Some(project_id),
+            ..Default::default()
+        };
+        self.list_tickets(page, page_size, &filters).await
+    }
+
+    /// Search agents by name/email. Endpoint guessed from list_agents'
+    /// confirmed base path — NOT confirmed against a real capture.
+    pub async fn search_agents(&self, query: &str, page_size: i64) -> Result<Vec<Value>, String> {
+        let params: Vec<(&str, String)> = vec![
+            ("search", query.to_string()),
+            ("pageinate", "true".into()),
+            ("page_no", "1".into()),
+            ("page_size", page_size.max(1).min(200).to_string()),
+        ];
+        let value = self.get_raw("/api/Agent", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// List asset types. Endpoint guessed from HaloPSA's singular
+    /// resource-name convention — NOT confirmed against a real capture.
+    pub async fn list_asset_types(&self) -> Result<Vec<Value>, String> {
+        let value = self.get_no_params("/api/AssetType").await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// List CRM opportunities. Confirmed against the agent UI's own
+    /// request — a dedicated /api/Opportunities endpoint (not Tickets,
+    /// despite opportunities being stored on the same underlying table).
+    pub async fn list_opportunities(
+        &self,
+        page: i64,
+        page_size: i64,
+        client_id: Option<i64>,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(200).to_string()),
+        ];
+        if let Some(id) = client_id {
+            params.push(("client_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Opportunities", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    /// Get a single opportunity by ID. Same base path as the confirmed
+    /// list_opportunities.
+    pub async fn get_opportunity(&self, opportunity_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Opportunities/{opportunity_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    /// Create a new opportunity. Same base path as the confirmed
+    /// list_opportunities; body shape unconfirmed against a real capture.
+    pub async fn create_opportunity(&self, opportunity: Value) -> Result<Value, String> {
+        self.post("/api/Opportunities", &json!([opportunity])).await
+    }
+
+    /// Update an existing opportunity. Same caveats as create_opportunity.
+    pub async fn update_opportunity(&self, opportunity_id: i64, mut fields: Value) -> Result<Value, String> {
+        if let Some(obj) = fields.as_object_mut() {
+            obj.insert("id".into(), json!(opportunity_id));
+        }
+        self.post("/api/Opportunities", &json!([fields])).await
+    }
+
+    /// List CRM notes against a client or supplier. Endpoint confirmed by
+    /// name only (a permission-denied response from a third-party
+    /// connector's account showed the path is /api/CRMNote) — params and
+    /// response shape unconfirmed.
+    pub async fn list_crm_notes(&self, client_id: Option<i64>, supplier_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = client_id {
+            params.push(("client_id", id.to_string()));
+        }
+        if let Some(id) = supplier_id {
+            params.push(("supplier_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/CRMNote", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// Create a CRM note. Same endpoint-confirmed-by-name caveat as
+    /// list_crm_notes.
+    pub async fn create_crm_note(&self, note: Value) -> Result<Value, String> {
+        self.post("/api/CRMNote", &json!([note])).await
+    }
+
+    /// List contact groups (shown in the agent UI as "Distribution
+    /// Lists"). Confirmed against the agent UI's own request.
+    pub async fn list_contact_groups(&self) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw(
+                "/api/distributionlists",
+                &[
+                    ("include_client_related", "false".into()),
+                    ("pageinate", "true".into()),
+                    ("page_size", "100".into()),
+                    ("page_no", "1".into()),
+                ],
+            )
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// Add or remove a user from a contact group (distribution list).
+    /// Field shape guessed — NOT confirmed against a real capture.
+    pub async fn manage_contact_group_members(&self, group_id: i64, user_id: i64, add: bool) -> Result<Value, String> {
+        let body = json!({
+            "id": group_id,
+            "members": [{ "user_id": user_id, "action": if add { "add" } else { "remove" } }],
+        });
+        self.post("/api/distributionlists", &json!([body])).await
+    }
+
+    /// List pending ticket approvals. Confirmed against the agent UI's own
+    /// request ("My Approvals" page).
+    pub async fn list_ticket_approvals(&self, mine: bool) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw(
+                "/api/TicketApproval",
+                &[("mine", mine.to_string()), ("include_attachments", "false".into())],
+            )
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// Approve or reject one or more pending approvals. Body shape
+    /// guessed — NOT confirmed against a real capture. Irreversible once
+    /// processed, per HaloPSA's own approval workflow semantics.
+    pub async fn process_approval(&self, approval_ids: &[i64], approve: bool) -> Result<Value, String> {
+        let body = json!({
+            "ids": approval_ids,
+            "result": if approve { 1 } else { 2 },
+        });
+        self.post("/api/TicketApproval", &body).await
+    }
+
+    /// List CSAT feedback entries. Endpoint guessed from HaloPSA's
+    /// singular resource-name convention — NOT confirmed against a real
+    /// capture.
+    pub async fn list_feedback(&self, client_id: Option<i64>, agent_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = client_id {
+            params.push(("client_id", id.to_string()));
+        }
+        if let Some(id) = agent_id {
+            params.push(("agent_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Feedback", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// List custom data tables. Endpoint guessed from HaloPSA's naming
+    /// convention (matches the shape returned by a third-party HaloPSA
+    /// connector) — NOT confirmed against a real capture.
+    pub async fn list_custom_tables(&self) -> Result<Vec<Value>, String> {
+        let value = self.get_no_params("/api/CustomTable").await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// Get a single custom table by ID. Same endpoint-guess caveat as
+    /// list_custom_tables.
+    pub async fn get_custom_table(&self, table_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/CustomTable/{table_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    /// Create a custom data table. Same endpoint-guess caveat as
+    /// list_custom_tables.
+    pub async fn create_custom_table(&self, table: Value) -> Result<Value, String> {
+        self.post("/api/CustomTable", &json!([table])).await
+    }
+
+    /// Delete a custom data table by ID. Same endpoint-guess caveat as
+    /// list_custom_tables. Permanently removes the table and its data.
+    pub async fn delete_custom_table(&self, table_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/CustomTable/{table_id}"), &[]).await
+    }
+
+    /// Update an existing client's fields.
+    pub async fn update_client(&self, client_id: i64, mut fields: Value) -> Result<Value, String> {
+        if let Some(obj) = fields.as_object_mut() {
+            obj.insert("id".into(), json!(client_id));
+        }
+        self.post("/api/Client", &json!([fields])).await
+    }
+
+    /// Generate a PDF from a saved report. Params extend the confirmed
+    /// run_report call with an ispdf flag — NOT confirmed against a real
+    /// capture.
+    pub async fn create_report_pdf(&self, report_id: i64, filters: &[Value]) -> Result<Value, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("includedetails", "true".into()),
+            ("loadreport", "true".into()),
+            ("dontloadsystemreport", "false".into()),
+            ("ispdf", "true".into()),
+        ];
+        if !filters.is_empty() {
+            params.push(("filters", json!(filters).to_string()));
+        }
+        self.get_raw(&format!("/api/Report/{report_id}"), &params).await
     }
 
     /// List teams/queues.
@@ -1127,6 +1417,8 @@ pub struct TicketFilter {
     pub tickettype_id: Option<i64>,
     pub open_only: bool,
     pub priority: Option<String>,
+    pub ticketarea_id: Option<i64>,
+    pub parent_id: Option<i64>,
 }
 
 // --- OAuth token management for service account ---

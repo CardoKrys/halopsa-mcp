@@ -423,6 +423,263 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "update_client",
+            "description": "Update an existing client's fields (name, contact details, custom fields).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "client_id": { "type": "integer", "description": "The client ID" },
+                    "fields": { "type": "object", "description": "Fields to update, e.g. { \"name\": \"Acme Corp\" }" }
+                },
+                "required": ["client_id", "fields"]
+            }
+        }),
+        json!({
+            "name": "list_asset_types",
+            "description": "List all available asset types configured in HaloPSA. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "search_agents",
+            "description": "Search agents (technicians) by name or email. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Search query string" },
+                    "page_size": { "type": "integer", "description": "Max results (default 50)", "default": 50 }
+                },
+                "required": ["query"]
+            }
+        }),
+        json!({
+            "name": "list_projects",
+            "description": "List projects (Tickets scoped to the 'Projects' ticket area). Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 },
+                    "client_id": { "type": "integer", "description": "Filter by client ID (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "get_project",
+            "description": "Get full details of a single project by ID (same underlying record as get_ticket).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "integer", "description": "The project (ticket) ID" }
+                },
+                "required": ["project_id"]
+            }
+        }),
+        json!({
+            "name": "create_project",
+            "description": "Create a new project. Requires an appropriate tickettype_id (use list_ticket_types to find the Project-designated type) — the Projects ticketarea_id is filled in automatically.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "fields": { "type": "object", "description": "Ticket fields, e.g. { \"summary\": \"Office Migration\", \"client_id\": 42, \"tickettype_id\": 20 }" }
+                },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "update_project",
+            "description": "Update an existing project's fields (same underlying record as update_ticket).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "integer", "description": "The project (ticket) ID" },
+                    "fields": { "type": "object", "description": "Fields to update" }
+                },
+                "required": ["project_id", "fields"]
+            }
+        }),
+        json!({
+            "name": "list_project_tasks",
+            "description": "List tasks (child tickets) under a project. Parent/child field unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "project_id": { "type": "integer", "description": "The project (ticket) ID" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                },
+                "required": ["project_id"]
+            }
+        }),
+        json!({
+            "name": "create_report_pdf",
+            "description": "Generate a PDF from a saved report. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "report_id": { "type": "integer", "description": "The report ID" },
+                    "filters": { "type": "array", "description": "Optional filter overrides, same shape as run_report's filters", "items": { "type": "object" } }
+                },
+                "required": ["report_id"]
+            }
+        }),
+        json!({
+            "name": "list_opportunities",
+            "description": "List CRM opportunities/deals (sales pipeline). Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-200, default 50)", "default": 50 },
+                    "client_id": { "type": "integer", "description": "Filter by client ID (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "get_opportunity",
+            "description": "Get full details of a single CRM opportunity by ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "opportunity_id": { "type": "integer", "description": "The opportunity ID" }
+                },
+                "required": ["opportunity_id"]
+            }
+        }),
+        json!({
+            "name": "create_opportunity",
+            "description": "Create a new CRM opportunity/deal. Body shape unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "fields": { "type": "object", "description": "Opportunity fields, e.g. { \"summary\": \"Managed Services Contract\", \"client_id\": 1, \"oppvalueadjusted\": 24000 }" }
+                },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "update_opportunity",
+            "description": "Update an existing CRM opportunity's fields (stage, value, probability, etc).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "opportunity_id": { "type": "integer", "description": "The opportunity ID" },
+                    "fields": { "type": "object", "description": "Fields to update" }
+                },
+                "required": ["opportunity_id", "fields"]
+            }
+        }),
+        json!({
+            "name": "list_crm_notes",
+            "description": "List CRM notes against a client or supplier. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "client_id": { "type": "integer", "description": "Filter by client ID (optional)" },
+                    "supplier_id": { "type": "integer", "description": "Filter by supplier ID (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "create_crm_note",
+            "description": "Create a CRM note against a client or supplier. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "fields": { "type": "object", "description": "Note fields, e.g. { \"client_id\": 1, \"note\": \"Discussed renewal terms\" }" }
+                },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "list_contact_groups",
+            "description": "List contact groups (shown in the agent UI as 'Distribution Lists').",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "manage_contact_group_members",
+            "description": "Add or remove a user from a contact group (distribution list). Field shape unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "group_id": { "type": "integer", "description": "The contact group ID" },
+                    "user_id": { "type": "integer", "description": "The user ID to add or remove" },
+                    "add": { "type": "boolean", "description": "true to add, false to remove (default true)", "default": true }
+                },
+                "required": ["group_id", "user_id"]
+            }
+        }),
+        json!({
+            "name": "list_ticket_approvals",
+            "description": "List pending ticket approvals.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "mine": { "type": "boolean", "description": "Only approvals awaiting your action (default true)", "default": true }
+                }
+            }
+        }),
+        json!({
+            "name": "process_approval",
+            "description": "Approve or reject one or more pending ticket approvals. WARNING: irreversible once processed. Body shape unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "approval_ids": { "type": "array", "items": { "type": "integer" }, "description": "Approval IDs to process" },
+                    "approve": { "type": "boolean", "description": "true to approve, false to reject" }
+                },
+                "required": ["approval_ids", "approve"]
+            }
+        }),
+        json!({
+            "name": "list_feedback",
+            "description": "List customer satisfaction (CSAT) feedback entries. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "client_id": { "type": "integer", "description": "Filter by client ID (optional)" },
+                    "agent_id": { "type": "integer", "description": "Filter by agent ID (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "list_custom_tables",
+            "description": "List custom data tables used for extending Halo's data model. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "get_custom_table",
+            "description": "Get a single custom table by ID, including column definitions. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "table_id": { "type": "integer", "description": "The custom table ID" }
+                },
+                "required": ["table_id"]
+            }
+        }),
+        json!({
+            "name": "create_custom_table",
+            "description": "Create a new custom data table. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "fields": { "type": "object", "description": "Table fields, e.g. { \"name\": \"Vendor Certifications\" }" }
+                },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "delete_custom_table",
+            "description": "Delete a custom table by ID. WARNING: permanently removes the table and all its data. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "table_id": { "type": "integer", "description": "The custom table ID" }
+                },
+                "required": ["table_id"]
+            }
+        }),
+        json!({
             "name": "list_ticket_types",
             "description": "List all available ticket types.",
             "inputSchema": { "type": "object", "properties": {} }
@@ -865,6 +1122,30 @@ pub async fn execute_tool(
         "get_status_details" => exec_get_status_details(args, client).await,
         "global_search" => exec_global_search(args, client).await,
         "list_field_groups" => exec_list_field_groups(client).await,
+        "update_client" => exec_update_client(args, client).await,
+        "list_asset_types" => exec_list_asset_types(client).await,
+        "search_agents" => exec_search_agents(args, client).await,
+        "list_projects" => exec_list_projects(args, client).await,
+        "get_project" => exec_get_project(args, client).await,
+        "create_project" => exec_create_project(args, client).await,
+        "update_project" => exec_update_project(args, client).await,
+        "list_project_tasks" => exec_list_project_tasks(args, client).await,
+        "create_report_pdf" => exec_create_report_pdf(args, client).await,
+        "list_opportunities" => exec_list_opportunities(args, client).await,
+        "get_opportunity" => exec_get_opportunity(args, client).await,
+        "create_opportunity" => exec_create_opportunity(args, client).await,
+        "update_opportunity" => exec_update_opportunity(args, client).await,
+        "list_crm_notes" => exec_list_crm_notes(args, client).await,
+        "create_crm_note" => exec_create_crm_note(args, client).await,
+        "list_contact_groups" => exec_list_contact_groups(client).await,
+        "manage_contact_group_members" => exec_manage_contact_group_members(args, client).await,
+        "list_ticket_approvals" => exec_list_ticket_approvals(args, client).await,
+        "process_approval" => exec_process_approval(args, client).await,
+        "list_feedback" => exec_list_feedback(args, client).await,
+        "list_custom_tables" => exec_list_custom_tables(client).await,
+        "get_custom_table" => exec_get_custom_table(args, client).await,
+        "create_custom_table" => exec_create_custom_table(args, client).await,
+        "delete_custom_table" => exec_delete_custom_table(args, client).await,
         "list_software_licences" => exec_list_software_licences(args, client).await,
         "get_software_licence" => exec_get_software_licence(args, client).await,
         "list_charge_rates" => exec_list_charge_rates(client).await,
@@ -1369,6 +1650,221 @@ async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<Stri
 async fn exec_list_field_groups(client: &HaloPSAClient) -> Result<String, String> {
     let groups = client.list_field_groups().await?;
     Ok(serde_json::to_string_pretty(&json!({ "field_groups": groups })).unwrap())
+}
+
+async fn exec_update_client(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let client_id = args.get("client_id").and_then(|v| v.as_i64()).ok_or("client_id is required")?;
+    let fields = args.get("fields").cloned().unwrap_or(json!({}));
+
+    let result = client.update_client(client_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_asset_types(client: &HaloPSAClient) -> Result<String, String> {
+    let types = client.list_asset_types().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "asset_types": types })).unwrap())
+}
+
+async fn exec_search_agents(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let query = args.get("query").and_then(|v| v.as_str()).ok_or("query is required")?;
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let agents = client.search_agents(query, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "agents": agents })).unwrap())
+}
+
+async fn exec_list_projects(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let client_id = args.get("client_id").and_then(|v| v.as_i64());
+
+    let (projects, total) = client.list_projects(page, page_size, client_id).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "projects": projects,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_get_project(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let project_id = args.get("project_id").and_then(|v| v.as_i64()).ok_or("project_id is required")?;
+
+    let result = client.get_project(project_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_project(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+
+    let result = client.create_project(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_project(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let project_id = args.get("project_id").and_then(|v| v.as_i64()).ok_or("project_id is required")?;
+    let fields = args.get("fields").cloned().unwrap_or(json!({}));
+
+    let result = client.update_project(project_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_project_tasks(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let project_id = args.get("project_id").and_then(|v| v.as_i64()).ok_or("project_id is required")?;
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (tasks, total) = client.list_project_tasks(project_id, page, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "tasks": tasks,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_create_report_pdf(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let report_id = args.get("report_id").and_then(|v| v.as_i64()).ok_or("report_id is required")?;
+    let filters: Vec<Value> = args
+        .get("filters")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let result = client.create_report_pdf(report_id, &filters).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_opportunities(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let client_id = args.get("client_id").and_then(|v| v.as_i64());
+
+    let (opportunities, total) = client.list_opportunities(page, page_size, client_id).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "opportunities": opportunities,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_get_opportunity(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let opportunity_id = args
+        .get("opportunity_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("opportunity_id is required")?;
+
+    let result = client.get_opportunity(opportunity_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_opportunity(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+
+    let result = client.create_opportunity(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_opportunity(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let opportunity_id = args
+        .get("opportunity_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("opportunity_id is required")?;
+    let fields = args.get("fields").cloned().unwrap_or(json!({}));
+
+    let result = client.update_opportunity(opportunity_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_crm_notes(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let client_id = args.get("client_id").and_then(|v| v.as_i64());
+    let supplier_id = args.get("supplier_id").and_then(|v| v.as_i64());
+
+    let notes = client.list_crm_notes(client_id, supplier_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "notes": notes })).unwrap())
+}
+
+async fn exec_create_crm_note(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+
+    let result = client.create_crm_note(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_contact_groups(client: &HaloPSAClient) -> Result<String, String> {
+    let groups = client.list_contact_groups().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "contact_groups": groups })).unwrap())
+}
+
+async fn exec_manage_contact_group_members(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let group_id = args.get("group_id").and_then(|v| v.as_i64()).ok_or("group_id is required")?;
+    let user_id = args.get("user_id").and_then(|v| v.as_i64()).ok_or("user_id is required")?;
+    let add = args.get("add").and_then(|v| v.as_bool()).unwrap_or(true);
+
+    let result = client.manage_contact_group_members(group_id, user_id, add).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_ticket_approvals(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let mine = args.get("mine").and_then(|v| v.as_bool()).unwrap_or(true);
+
+    let approvals = client.list_ticket_approvals(mine).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "approvals": approvals })).unwrap())
+}
+
+async fn exec_process_approval(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let approval_ids: Vec<i64> = args
+        .get("approval_ids")
+        .and_then(|v| v.as_array())
+        .ok_or("approval_ids is required")?
+        .iter()
+        .filter_map(|v| v.as_i64())
+        .collect();
+    let approve = args.get("approve").and_then(|v| v.as_bool()).ok_or("approve is required")?;
+
+    let result = client.process_approval(&approval_ids, approve).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_feedback(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let client_id = args.get("client_id").and_then(|v| v.as_i64());
+    let agent_id = args.get("agent_id").and_then(|v| v.as_i64());
+
+    let feedback = client.list_feedback(client_id, agent_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "feedback": feedback })).unwrap())
+}
+
+async fn exec_list_custom_tables(client: &HaloPSAClient) -> Result<String, String> {
+    let tables = client.list_custom_tables().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "custom_tables": tables })).unwrap())
+}
+
+async fn exec_get_custom_table(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let table_id = args.get("table_id").and_then(|v| v.as_i64()).ok_or("table_id is required")?;
+
+    let result = client.get_custom_table(table_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_custom_table(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+
+    let result = client.create_custom_table(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_custom_table(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let table_id = args.get("table_id").and_then(|v| v.as_i64()).ok_or("table_id is required")?;
+
+    client.delete_custom_table(table_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "table_id": table_id })).unwrap())
 }
 
 async fn exec_list_software_licences(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
