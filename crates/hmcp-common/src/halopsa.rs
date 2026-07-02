@@ -749,6 +749,26 @@ impl HaloPSAClient {
         .await
     }
 
+    /// List the priority levels defined on an SLA. Confirmed shape from
+    /// the agent UI's rendered Priorities tab (level, description,
+    /// response target, resolution target) — the exact JSON field name
+    /// wrapping this array in the API response is NOT confirmed (bearer
+    /// auth blocks direct API navigation, and DevTools isn't reachable via
+    /// browser automation). Tries the likely "priorities" key first,
+    /// falling back to the first array field found in the SLA response.
+    pub async fn list_priorities(&self, sla_id: i64) -> Result<Vec<Value>, String> {
+        let sla = self.get_sla(sla_id).await?;
+        if let Some(arr) = sla.get("priorities").and_then(|v| v.as_array()) {
+            return Ok(arr.clone());
+        }
+        if let Some(obj) = sla.as_object() {
+            if let Some(arr) = obj.values().find_map(|v| v.as_array()) {
+                return Ok(arr.clone());
+            }
+        }
+        Ok(Vec::new())
+    }
+
     /// List action outcomes. Confirmed against the agent UI's own request.
     pub async fn list_outcomes(&self) -> Result<Vec<Value>, String> {
         let value = self

@@ -638,6 +638,17 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "list_priorities",
+            "description": "List the priority levels defined on an SLA (e.g. P1 Site Down, P2 Mission Critical). Use list_slas to find SLA IDs. Priorities are per-SLA, not global.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "sla_id": { "type": "integer", "description": "The SLA ID" }
+                },
+                "required": ["sla_id"]
+            }
+        }),
+        json!({
             "name": "list_outcomes",
             "description": "List all action outcome definitions (e.g. the options available when adding an action to a ticket).",
             "inputSchema": { "type": "object", "properties": {} }
@@ -744,6 +755,7 @@ pub async fn execute_tool(
         "get_asset_group" => exec_get_asset_group(args, client).await,
         "list_slas" => exec_list_slas(client).await,
         "get_sla" => exec_get_sla(args, client).await,
+        "list_priorities" => exec_list_priorities(args, client).await,
         "list_outcomes" => exec_list_outcomes(client).await,
         "list_categories" => exec_list_categories(args, client).await,
         "run_report" => exec_run_report(args, client).await,
@@ -1643,6 +1655,16 @@ async fn exec_get_sla(args: &Value, client: &HaloPSAClient) -> Result<String, St
 
     let result = client.get_sla(sla_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_priorities(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let sla_id = args
+        .get("sla_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("sla_id is required")?;
+
+    let priorities = client.list_priorities(sla_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "priorities": priorities })).unwrap())
 }
 
 async fn exec_list_outcomes(client: &HaloPSAClient) -> Result<String, String> {
