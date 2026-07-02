@@ -91,6 +91,41 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "list_open_tickets",
+            "description": "List open (unresolved) tickets. Convenience wrapper over list_tickets with open_only=true.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "list_tickets_by_client",
+            "description": "List tickets for a specific client. Convenience wrapper over list_tickets with client_id set.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "client_id": { "type": "integer", "description": "The client ID" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                },
+                "required": ["client_id"]
+            }
+        }),
+        json!({
+            "name": "list_my_tickets",
+            "description": "List tickets assigned to the authenticated agent. Resolves your own agent ID via get_me (best-effort — if identity resolution fails, this will error; fall back to list_tickets with an explicit agent_id in that case).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
             "name": "list_actions",
             "description": "List all actions (notes, replies, workflow transitions) on a ticket.",
             "inputSchema": {
@@ -644,6 +679,9 @@ pub async fn execute_tool(
         "create_ticket" => exec_create_ticket(args, client).await,
         "update_ticket" => exec_update_ticket(args, client).await,
         "search_tickets" => exec_search_tickets(args, client).await,
+        "list_open_tickets" => exec_list_open_tickets(args, client).await,
+        "list_tickets_by_client" => exec_list_tickets_by_client(args, client).await,
+        "list_my_tickets" => exec_list_my_tickets(args, client).await,
         "list_actions" | "list_ticket_actions" => exec_list_actions(args, client).await,
         "add_action" => exec_add_action(args, client).await,
         "send_email_reply" => exec_send_email_reply(args, client).await,
@@ -704,6 +742,24 @@ pub async fn execute_tool(
 
 // --- Tool implementations ---
 
+fn summarize_tickets(tickets: &[Value]) -> Vec<Value> {
+    tickets
+        .iter()
+        .map(|t| {
+            json!({
+                "id": t.get("id"),
+                "summary": t.get("summary"),
+                "client_name": t.get("client_name"),
+                "agent_name": t.get("agent_name"),
+                "team": t.get("team"),
+                "status": t.get("status"),
+                "priority": t.get("priority"),
+                "dateoccurred": t.get("dateoccurred"),
+            })
+        })
+        .collect()
+}
+
 async fn exec_list_tickets(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
     let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
@@ -720,24 +776,76 @@ async fn exec_list_tickets(args: &Value, client: &HaloPSAClient) -> Result<Strin
 
     let (tickets, total) = client.list_tickets(page, page_size, &filter).await?;
 
-    let summary: Vec<Value> = tickets
-        .iter()
-        .map(|t| {
-            json!({
-                "id": t.get("id"),
-                "summary": t.get("summary"),
-                "client_name": t.get("client_name"),
-                "agent_name": t.get("agent_name"),
-                "team": t.get("team"),
-                "status": t.get("status"),
-                "priority": t.get("priority"),
-                "dateoccurred": t.get("dateoccurred"),
-            })
-        })
-        .collect();
+    Ok(serde_json::to_string_pretty(&json!({
+        "tickets": summarize_tickets(&tickets),
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_open_tickets(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let filter = TicketFilter {
+        open_only: true,
+        ..Default::default()
+    };
+    let (tickets, total) = client.list_tickets(page, page_size, &filter).await?;
 
     Ok(serde_json::to_string_pretty(&json!({
-        "tickets": summary,
+        "tickets": summarize_tickets(&tickets),
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_tickets_by_client(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let client_id = args
+        .get("client_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("client_id is required")?;
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let filter = TicketFilter {
+        client_id: Some(client_id),
+        ..Default::default()
+    };
+    let (tickets, total) = client.list_tickets(page, page_size, &filter).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "tickets": summarize_tickets(&tickets),
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_my_tickets(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let me = client.get_me().await?;
+    let agent_id = me
+        .get("agentid")
+        .or_else(|| me.get("agent_id"))
+        .and_then(|v| v.as_i64())
+        .ok_or("Could not resolve your agent ID from get_me — fall back to list_tickets with an explicit agent_id")?;
+
+    let filter = TicketFilter {
+        agent_id: Some(agent_id),
+        ..Default::default()
+    };
+    let (tickets, total) = client.list_tickets(page, page_size, &filter).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "tickets": summarize_tickets(&tickets),
         "total_count": total,
         "page": page,
         "page_size": page_size,
