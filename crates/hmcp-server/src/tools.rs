@@ -319,6 +319,18 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "search_users",
+            "description": "Search users (end-user contacts) by keyword. Returns matching users.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Search query" },
+                    "page_size": { "type": "integer", "description": "Max results (default 20)", "default": 20 }
+                },
+                "required": ["query"]
+            }
+        }),
+        json!({
             "name": "list_reports",
             "description": "List saved report definitions within a category (use list_report_categories to find category IDs, or pass 0 for All Reports), or search by name across every category. When search is provided, it takes priority and reportgroup_id is ignored — search spans all categories. Returns paginated results.",
             "inputSchema": {
@@ -614,6 +626,7 @@ pub async fn execute_tool(
         "search_clients" => exec_search_clients(args, client).await,
         "list_users" => exec_list_users(args, client).await,
         "get_user" => exec_get_user(args, client).await,
+        "search_users" => exec_search_users(args, client).await,
         "list_reports" => exec_list_reports(args, client).await,
         "list_report_categories" => exec_list_report_categories(client).await,
         "get_lookup_values" => exec_get_lookup_values(args, client).await,
@@ -1032,6 +1045,25 @@ async fn exec_get_user(args: &Value, client: &HaloPSAClient) -> Result<String, S
 
     let result = client.get_user(user_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_search_users(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let query = args
+        .get("query")
+        .and_then(|v| v.as_str())
+        .ok_or("query is required")?;
+    let page_size = args
+        .get("page_size")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(20);
+
+    let (users, total) = client.search_users(query, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "results": users,
+        "total_count": total,
+    }))
+    .unwrap())
 }
 
 async fn exec_list_reports(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

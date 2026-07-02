@@ -430,6 +430,11 @@ impl HaloPSAClient {
         Ok((records, record_count))
     }
 
+    /// Search users by keyword.
+    pub async fn search_users(&self, query: &str, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        self.list_users(1, page_size, None, Some(query)).await
+    }
+
     /// Get a single user (end-user contact) by ID.
     pub async fn get_user(&self, user_id: i64) -> Result<Value, String> {
         self.get_raw(
