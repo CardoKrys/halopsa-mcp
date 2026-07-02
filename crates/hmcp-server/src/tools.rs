@@ -308,6 +308,17 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "get_user",
+            "description": "Get full details of a single user (end-user contact) by ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "user_id": { "type": "integer", "description": "The user ID" }
+                },
+                "required": ["user_id"]
+            }
+        }),
+        json!({
             "name": "list_reports",
             "description": "List saved report definitions within a category (use list_report_categories to find category IDs, or pass 0 for All Reports), or search by name across every category. When search is provided, it takes priority and reportgroup_id is ignored — search spans all categories. Returns paginated results.",
             "inputSchema": {
@@ -602,6 +613,7 @@ pub async fn execute_tool(
         "list_clients" => exec_list_clients(args, client).await,
         "search_clients" => exec_search_clients(args, client).await,
         "list_users" => exec_list_users(args, client).await,
+        "get_user" => exec_get_user(args, client).await,
         "list_reports" => exec_list_reports(args, client).await,
         "list_report_categories" => exec_list_report_categories(client).await,
         "get_lookup_values" => exec_get_lookup_values(args, client).await,
@@ -1010,6 +1022,16 @@ async fn exec_list_users(args: &Value, client: &HaloPSAClient) -> Result<String,
         "page_size": page_size,
     }))
     .unwrap())
+}
+
+async fn exec_get_user(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let user_id = args
+        .get("user_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("user_id is required")?;
+
+    let result = client.get_user(user_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_list_reports(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

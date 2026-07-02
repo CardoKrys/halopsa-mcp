@@ -404,20 +404,38 @@ impl HaloPSAClient {
             ("pageinate", "true".into()),
             ("page_no", page.to_string()),
             ("page_size", page_size.max(1).min(100).to_string()),
+            // Confirmed against the agent UI's Users tab request — without
+            // these, results are liable to include agents/service accounts
+            // rather than genuine end-user contacts.
+            ("onlyusers", "true".into()),
+            ("includeserviceaccount", "true".into()),
+            ("includenonserviceaccount", "true".into()),
+            ("exclude_generaluser", "false".into()),
+            ("exclude_agents", "false".into()),
+            ("exclude_defaultsiteusers", "false".into()),
         ];
         if let Some(id) = client_id {
             params.push(("client_id", id.to_string()));
         }
         if let Some(s) = search {
-            // Unconfirmed against the sandbox — mirrors the advanced_search
-            // fix confirmed for /api/Client, same underlying list mechanism.
-            // A plain "search" param was never confirmed working here either.
+            // Still unconfirmed against the sandbox — mirrors the
+            // advanced_search fix confirmed for /api/Client, same
+            // underlying list mechanism, but never directly tested here.
             params.push(("advanced_search", advanced_search_filter("name", s)));
         }
         let value = self.get_raw("/api/Users", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
         let records = parse_halo_list::<Value>(value);
         Ok((records, record_count))
+    }
+
+    /// Get a single user (end-user contact) by ID.
+    pub async fn get_user(&self, user_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Users/{user_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
     }
 
     /// List saved report definitions within a category (reportgroup_id=0
