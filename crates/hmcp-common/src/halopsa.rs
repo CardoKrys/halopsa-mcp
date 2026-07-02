@@ -420,25 +420,49 @@ impl HaloPSAClient {
         Ok((records, record_count))
     }
 
-    /// List saved report definitions with optional keyword search.
+    /// List saved report definitions within a category (reportgroup_id=0
+    /// is "All Reports", confirmed against the agent UI). `search`
+    /// filters by name on our side after fetching — there's no confirmed
+    /// working keyword-search mechanism on this endpoint, so this only
+    /// matches within the fetched page rather than the full catalog.
     pub async fn list_reports(
         &self,
         page: i64,
         page_size: i64,
+        reportgroup_id: i64,
         search: Option<&str>,
     ) -> Result<(Vec<Value>, i64), String> {
-        let mut params: Vec<(&str, String)> = vec![
+        let params: Vec<(&str, String)> = vec![
             ("pageinate", "true".into()),
             ("page_no", page.to_string()),
             ("page_size", page_size.max(1).min(100).to_string()),
+            ("order", "name".into()),
+            ("orderdesc", "false".into()),
+            ("type", "0".into()),
+            ("reportgroup_id", reportgroup_id.to_string()),
         ];
-        if let Some(s) = search {
-            params.push(("advanced_search", advanced_search_filter("name", s)));
-        }
         let value = self.get_raw("/api/Report", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
-        let records = parse_halo_list::<Value>(value);
+        let mut records = parse_halo_list::<Value>(value);
+        if let Some(s) = search {
+            let needle = s.to_lowercase();
+            records.retain(|r| {
+                r.get("name")
+                    .and_then(|v| v.as_str())
+                    .map(|n| n.to_lowercase().contains(&needle))
+                    .unwrap_or(false)
+            });
+        }
         Ok((records, record_count))
+    }
+
+    /// List report categories (groups) — confirmed against the agent UI as
+    /// a generic lookup table (lookupid=41), not a Report-specific endpoint.
+    pub async fn list_report_categories(&self) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw("/api/Lookup", &[("lookupid", "41".into()), ("istree", "true".into())])
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
     }
 
     /// Run a saved report by ID and return the full response, including

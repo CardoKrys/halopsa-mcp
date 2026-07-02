@@ -309,15 +309,21 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_reports",
-            "description": "List saved report definitions with optional keyword search. Returns paginated results.",
+            "description": "List saved report definitions within a category. Use list_report_categories to find category IDs, or omit reportgroup_id / pass 0 for All Reports. Returns paginated results.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
                     "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 },
-                    "search": { "type": "string", "description": "Keyword search across report name" }
+                    "reportgroup_id": { "type": "integer", "description": "Category ID from list_report_categories (default 0 = All Reports)", "default": 0 },
+                    "search": { "type": "string", "description": "Keyword match on report name. Filters within the fetched page only (no server-side search confirmed for this endpoint) — increase page_size for broader coverage" }
                 }
             }
+        }),
+        json!({
+            "name": "list_report_categories",
+            "description": "List report categories/groups (e.g. 'My Reports', 'KPI Reports'). Use the returned id as reportgroup_id in list_reports.",
+            "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
             "name": "run_report",
@@ -432,6 +438,7 @@ pub async fn execute_tool(
         "search_clients" => exec_search_clients(args, client).await,
         "list_users" => exec_list_users(args, client).await,
         "list_reports" => exec_list_reports(args, client).await,
+        "list_report_categories" => exec_list_report_categories(client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -830,17 +837,24 @@ async fn exec_list_users(args: &Value, client: &HaloPSAClient) -> Result<String,
 async fn exec_list_reports(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
     let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let reportgroup_id = args.get("reportgroup_id").and_then(|v| v.as_i64()).unwrap_or(0);
     let search = args.get("search").and_then(|v| v.as_str());
 
-    let (reports, total) = client.list_reports(page, page_size, search).await?;
+    let (reports, total) = client.list_reports(page, page_size, reportgroup_id, search).await?;
 
     Ok(serde_json::to_string_pretty(&json!({
         "reports": reports,
         "total_count": total,
         "page": page,
         "page_size": page_size,
+        "reportgroup_id": reportgroup_id,
     }))
     .unwrap())
+}
+
+async fn exec_list_report_categories(client: &HaloPSAClient) -> Result<String, String> {
+    let categories = client.list_report_categories().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "categories": categories })).unwrap())
 }
 
 async fn exec_run_report(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
