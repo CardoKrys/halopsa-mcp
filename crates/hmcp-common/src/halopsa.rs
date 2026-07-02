@@ -435,6 +435,54 @@ impl HaloPSAClient {
         Ok(parse_halo_list::<Value>(value))
     }
 
+    /// List invoices. Confirmed against the agent UI's own request.
+    pub async fn list_invoices(&self, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+            ("includeinvoices", "true".into()),
+            ("includecredits", "false".into()),
+            ("includepoinvoices", "false".into()),
+        ];
+        let value = self.get_raw("/api/Invoice", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    /// List recurring invoices. Confirmed against the agent UI's own
+    /// request.
+    pub async fn list_recurring_invoices(&self, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+            ("includeinactive", "true".into()),
+            ("includeinvoices", "true".into()),
+            ("includecredits", "false".into()),
+            ("includepoinvoices", "false".into()),
+            ("includelines", "true".into()),
+        ];
+        let value = self.get_raw("/api/RecurringInvoice", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    /// Get a single recurring invoice by ID. Confirmed against the agent
+    /// UI's own request.
+    pub async fn get_recurring_invoice(&self, recurring_invoice_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/RecurringInvoice/{recurring_invoice_id}"),
+            &[
+                ("includedetails", "true".into()),
+                ("includelinkedcreditnotes", "true".into()),
+            ],
+        )
+        .await
+    }
+
     /// List teams/queues.
     pub async fn list_teams(&self) -> Result<Vec<Value>, String> {
         let value = self.get_no_params("/api/Team").await?;

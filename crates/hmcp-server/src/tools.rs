@@ -341,6 +341,39 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "list_invoices",
+            "description": "List invoices. Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "list_recurring_invoices",
+            "description": "List recurring invoices (billing templates that generate invoices on a schedule). Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_recurring_invoice",
+            "description": "Get full details of a single recurring invoice by ID, including its lines and linked credit notes.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "recurring_invoice_id": { "type": "integer", "description": "The recurring invoice ID" }
+                },
+                "required": ["recurring_invoice_id"]
+            }
+        }),
+        json!({
             "name": "list_teams",
             "description": "List all teams/queues the user has access to.",
             "inputSchema": { "type": "object", "properties": {} }
@@ -788,6 +821,9 @@ pub async fn execute_tool(
         "get_status_details" => exec_get_status_details(args, client).await,
         "global_search" => exec_global_search(args, client).await,
         "list_field_groups" => exec_list_field_groups(client).await,
+        "list_invoices" => exec_list_invoices(args, client).await,
+        "list_recurring_invoices" => exec_list_recurring_invoices(args, client).await,
+        "get_recurring_invoice" => exec_get_recurring_invoice(args, client).await,
         "list_teams" => exec_list_teams(client).await,
         "list_ticket_types" => exec_list_ticket_types(client).await,
         "get_client" => exec_get_client(args, client).await,
@@ -1284,6 +1320,46 @@ async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<Stri
 async fn exec_list_field_groups(client: &HaloPSAClient) -> Result<String, String> {
     let groups = client.list_field_groups().await?;
     Ok(serde_json::to_string_pretty(&json!({ "field_groups": groups })).unwrap())
+}
+
+async fn exec_list_invoices(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (invoices, total) = client.list_invoices(page, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "invoices": invoices,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_recurring_invoices(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (invoices, total) = client.list_recurring_invoices(page, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "recurring_invoices": invoices,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_get_recurring_invoice(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let recurring_invoice_id = args
+        .get("recurring_invoice_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("recurring_invoice_id is required")?;
+
+    let result = client.get_recurring_invoice(recurring_invoice_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_list_teams(client: &HaloPSAClient) -> Result<String, String> {
