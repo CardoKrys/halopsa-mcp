@@ -604,6 +604,20 @@ impl HaloPSAClient {
         self.list_assets(1, page_size, None, Some(query)).await
     }
 
+    /// List sites. Confirmed against the agent UI — plain pageinate
+    /// convention, no unusual params.
+    pub async fn list_sites(&self, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        let value = self.get_raw("/api/site", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
     // --- Internal HTTP methods ---
 
     async fn get_raw(

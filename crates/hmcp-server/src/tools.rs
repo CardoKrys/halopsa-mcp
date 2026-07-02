@@ -440,6 +440,17 @@ pub fn tool_definitions() -> Vec<Value> {
                 "required": ["query"]
             }
         }),
+        json!({
+            "name": "list_sites",
+            "description": "List sites. Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
     ]
 }
 
@@ -515,6 +526,7 @@ pub async fn execute_tool(
         "get_asset" => exec_get_asset(args, client).await,
         "list_assets" => exec_list_assets(args, client).await,
         "search_assets" => exec_search_assets(args, client).await,
+        "list_sites" => exec_list_sites(args, client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -1102,6 +1114,21 @@ async fn exec_search_assets(args: &Value, client: &HaloPSAClient) -> Result<Stri
     Ok(serde_json::to_string_pretty(&json!({
         "results": summarize_assets(&assets),
         "total_count": total,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_sites(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (sites, total) = client.list_sites(page, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "sites": sites,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
     }))
     .unwrap())
 }
