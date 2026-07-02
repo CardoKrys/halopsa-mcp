@@ -246,8 +246,13 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_statuses",
-            "description": "List all available ticket statuses with their IDs.",
-            "inputSchema": { "type": "object", "properties": {} }
+            "description": "List available statuses with their IDs. Pass status_type \"ticket\" to scope to ticket statuses only; omit for all statuses regardless of type.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "status_type": { "type": "string", "description": "Filter by status type, e.g. \"ticket\". Omit for all statuses." }
+                }
+            }
         }),
         json!({
             "name": "list_teams",
@@ -650,7 +655,7 @@ pub async fn execute_tool(
         "delete_action" => exec_delete_action(args, client).await,
         "get_available_actions" => exec_get_available_actions(args, client).await,
         "execute_workflow_action" => exec_execute_workflow_action(args, client).await,
-        "list_statuses" => exec_list_statuses(client).await,
+        "list_statuses" => exec_list_statuses(args, client).await,
         "list_teams" => exec_list_teams(client).await,
         "list_ticket_types" => exec_list_ticket_types(client).await,
         "get_client" => exec_get_client(args, client).await,
@@ -969,8 +974,9 @@ async fn exec_execute_workflow_action(
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
-async fn exec_list_statuses(client: &HaloPSAClient) -> Result<String, String> {
-    let statuses = client.list_statuses().await?;
+async fn exec_list_statuses(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let status_type = args.get("status_type").and_then(|v| v.as_str());
+    let statuses = client.list_statuses(status_type).await?;
     let summary: Vec<Value> = statuses
         .iter()
         .map(|s| {

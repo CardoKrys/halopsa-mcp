@@ -343,9 +343,15 @@ impl HaloPSAClient {
 
     // --- Supporting lookups ---
 
-    /// List all statuses.
-    pub async fn list_statuses(&self) -> Result<Vec<Value>, String> {
-        let value = self.get_no_params("/api/Status").await?;
+    /// List statuses, optionally filtered by type (e.g. "ticket").
+    /// Confirmed against the agent UI's own request — omitting the filter
+    /// returns all statuses regardless of type.
+    pub async fn list_statuses(&self, status_type: Option<&str>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = Vec::new();
+        if let Some(t) = status_type {
+            params.push(("type", t.to_string()));
+        }
+        let value = self.get_raw("/api/Status", &params).await?;
         Ok(parse_halo_list::<Value>(value))
     }
 
