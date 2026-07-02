@@ -566,6 +566,44 @@ impl HaloPSAClient {
         .await
     }
 
+    /// List assets, optionally filtered by type and/or keyword search.
+    /// Confirmed against the agent UI: assettype_id is simply omitted for
+    /// "All Assets" (no sentinel value needed, unlike Reports' reportgroup_id).
+    /// Search sends both globalSearchID and search set to the same term.
+    pub async fn list_assets(
+        &self,
+        page: i64,
+        page_size: i64,
+        assettype_id: Option<i64>,
+        search: Option<&str>,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+            ("includeinactive", "false".into()),
+            ("includechildren", "true".into()),
+            ("convert_date_assetfields_to_iso", "true".into()),
+            ("convert_int_assetfield", "true".into()),
+        ];
+        if let Some(id) = assettype_id {
+            params.push(("assettype_id", id.to_string()));
+        }
+        if let Some(s) = search {
+            params.push(("globalSearchID", s.to_string()));
+            params.push(("search", s.to_string()));
+        }
+        let value = self.get_raw("/api/asset", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    /// Search assets by keyword across all types.
+    pub async fn search_assets(&self, query: &str, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        self.list_assets(1, page_size, None, Some(query)).await
+    }
+
     // --- Internal HTTP methods ---
 
     async fn get_raw(

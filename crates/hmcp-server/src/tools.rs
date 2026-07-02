@@ -415,6 +415,31 @@ pub fn tool_definitions() -> Vec<Value> {
                 "required": ["asset_id"]
             }
         }),
+        json!({
+            "name": "list_assets",
+            "description": "List assets, optionally filtered by asset type. Omit assettype_id for all types. Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 },
+                    "assettype_id": { "type": "integer", "description": "Filter by asset type ID. Omit for all types." },
+                    "search": { "type": "string", "description": "Keyword search across assets" }
+                }
+            }
+        }),
+        json!({
+            "name": "search_assets",
+            "description": "Search assets by keyword across all types. Returns matching assets.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Search query" },
+                    "page_size": { "type": "integer", "description": "Max results (default 20)", "default": 20 }
+                },
+                "required": ["query"]
+            }
+        }),
     ]
 }
 
@@ -488,6 +513,8 @@ pub async fn execute_tool(
         "get_agent" => exec_get_agent(args, client).await,
         "list_workflow_steps" => exec_list_workflow_steps(args, client).await,
         "get_asset" => exec_get_asset(args, client).await,
+        "list_assets" => exec_list_assets(args, client).await,
+        "search_assets" => exec_search_assets(args, client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -1014,7 +1041,21 @@ async fn exec_get_ticket_assets(args: &Value, client: &HaloPSAClient) -> Result<
         .ok_or("ticket_id is required")?;
 
     let assets = client.get_ticket_assets(ticket_id).await?;
-    let summary: Vec<Value> = assets
+    Ok(serde_json::to_string_pretty(&json!({ "assets": summarize_assets(&assets) })).unwrap())
+}
+
+async fn exec_get_asset(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let asset_id = args
+        .get("asset_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("asset_id is required")?;
+
+    let result = client.get_asset(asset_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+fn summarize_assets(assets: &[Value]) -> Vec<Value> {
+    assets
         .iter()
         .map(|a| {
             json!({
@@ -1026,18 +1067,43 @@ async fn exec_get_ticket_assets(args: &Value, client: &HaloPSAClient) -> Result<
                 "client_name": a.get("client_name"),
             })
         })
-        .collect();
-    Ok(serde_json::to_string_pretty(&json!({ "assets": summary })).unwrap())
+        .collect()
 }
 
-async fn exec_get_asset(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let asset_id = args
-        .get("asset_id")
-        .and_then(|v| v.as_i64())
-        .ok_or("asset_id is required")?;
+async fn exec_list_assets(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let assettype_id = args.get("assettype_id").and_then(|v| v.as_i64());
+    let search = args.get("search").and_then(|v| v.as_str());
 
-    let result = client.get_asset(asset_id).await?;
-    Ok(serde_json::to_string_pretty(&result).unwrap())
+    let (assets, total) = client.list_assets(page, page_size, assettype_id, search).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "assets": summarize_assets(&assets),
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_search_assets(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let query = args
+        .get("query")
+        .and_then(|v| v.as_str())
+        .ok_or("query is required")?;
+    let page_size = args
+        .get("page_size")
+        .and_then(|v| v.as_i64())
+        .unwrap_or(20);
+
+    let (assets, total) = client.search_assets(query, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "results": summarize_assets(&assets),
+        "total_count": total,
+    }))
+    .unwrap())
 }
 
 async fn exec_log_time(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
