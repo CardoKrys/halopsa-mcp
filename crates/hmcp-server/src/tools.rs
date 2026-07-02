@@ -574,6 +574,22 @@ pub fn tool_definitions() -> Vec<Value> {
                 "required": ["sla_id"]
             }
         }),
+        json!({
+            "name": "list_outcomes",
+            "description": "List all action outcome definitions (e.g. the options available when adding an action to a ticket).",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "list_categories",
+            "description": "List categories of a given type. type_id 1 = ticket categories, type_id 2 = resolution categories. There may be other category types on this instance — use list_categories with different type_id values to discover them if needed.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "type_id": { "type": "integer", "description": "Category type ID (1 = ticket categories, 2 = resolution categories)" }
+                },
+                "required": ["type_id"]
+            }
+        }),
     ]
 }
 
@@ -660,6 +676,8 @@ pub async fn execute_tool(
         "get_asset_group" => exec_get_asset_group(args, client).await,
         "list_slas" => exec_list_slas(client).await,
         "get_sla" => exec_get_sla(args, client).await,
+        "list_outcomes" => exec_list_outcomes(client).await,
+        "list_categories" => exec_list_categories(args, client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -1424,6 +1442,46 @@ async fn exec_get_sla(args: &Value, client: &HaloPSAClient) -> Result<String, St
 
     let result = client.get_sla(sla_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_outcomes(client: &HaloPSAClient) -> Result<String, String> {
+    let outcomes = client.list_outcomes().await?;
+    let summary: Vec<Value> = outcomes
+        .iter()
+        .map(|o| {
+            json!({
+                "id": o.get("id"),
+                "outcome": o.get("outcome"),
+                "labellong": o.get("labellong"),
+                "hidden": o.get("hidden"),
+                "sequence": o.get("sequence"),
+            })
+        })
+        .collect();
+    Ok(serde_json::to_string_pretty(&json!({ "outcomes": summary })).unwrap())
+}
+
+async fn exec_list_categories(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let type_id = args
+        .get("type_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("type_id is required")?;
+
+    let categories = client.list_categories(type_id).await?;
+    let summary: Vec<Value> = categories
+        .iter()
+        .map(|c| {
+            json!({
+                "id": c.get("id"),
+                "value": c.get("value"),
+                "type_id": c.get("type_id"),
+                "priority_id": c.get("priority_id"),
+                "sla_id": c.get("sla_id"),
+                "chargerate": c.get("chargerate"),
+            })
+        })
+        .collect();
+    Ok(serde_json::to_string_pretty(&json!({ "categories": summary })).unwrap())
 }
 
 async fn exec_log_time(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

@@ -735,6 +735,31 @@ impl HaloPSAClient {
         .await
     }
 
+    /// List action outcomes. Confirmed against the agent UI's own request.
+    pub async fn list_outcomes(&self) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw(
+                "/api/Outcome",
+                &[("showhidden", "true".into()), ("access_control_level", "2".into())],
+            )
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// List categories of a given type. Confirmed against the agent UI:
+    /// type_id=1 is ticket categories, type_id=2 is resolution categories —
+    /// there are reportedly 4 category types total on this instance, so
+    /// type_id is a required param rather than hardcoding just these two.
+    pub async fn list_categories(&self, type_id: i64) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw(
+                "/api/Category",
+                &[("showall", "true".into()), ("type_id", type_id.to_string())],
+            )
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
     // --- Internal HTTP methods ---
 
     async fn get_raw(
