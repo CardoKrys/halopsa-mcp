@@ -321,14 +321,27 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "run_report",
-            "description": "Run a saved HaloPSA report by ID and return its result rows. Use list_reports to find report IDs.",
+            "description": "Run a saved HaloPSA report by ID and return its result rows. Use list_reports to find report IDs. The response includes filterable_columns — only filter on fields listed there. To narrow results, pass filters overriding the report's saved filter set.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "report_id": { "type": "integer", "description": "The report ID (from list_reports)" },
+                    "filters": {
+                        "type": "array",
+                        "description": "Override the report's filters. Each item filters one column. Only stringruletype 0 (Includes) and 1 (Does not include) are confirmed — avoid other values until confirmed.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "fieldname": { "type": "string", "description": "Column name to filter on — must be one of the report's filterable_columns" },
+                                "stringruletype": { "type": "integer", "description": "0 = Includes, 1 = Does not include" },
+                                "stringrulevalues": { "type": "array", "items": { "type": "string" }, "description": "One or more values to match against this column" }
+                            },
+                            "required": ["fieldname", "stringruletype", "stringrulevalues"]
+                        }
+                    },
                     "parameters": {
                         "type": "object",
-                        "description": "Optional report-specific filter parameters as key-value pairs (varies per report — e.g. some reports take a 'clientname' filter)",
+                        "description": "Optional report-specific query parameters as key-value pairs (varies per report — e.g. some reports take a 'clientname' filter). Unconfirmed whether these actually affect results — prefer filters for narrowing by column.",
                         "additionalProperties": { "type": "string" }
                     }
                 },
@@ -836,6 +849,33 @@ async fn exec_run_report(args: &Value, client: &HaloPSAClient) -> Result<String,
         .and_then(|v| v.as_i64())
         .ok_or("report_id is required")?;
 
+    let mut filters: Vec<Value> = Vec::new();
+    if let Some(arr) = args.get("filters").and_then(|v| v.as_array()) {
+        for f in arr {
+            let fieldname = f
+                .get("fieldname")
+                .and_then(|v| v.as_str())
+                .ok_or("filters[].fieldname is required")?;
+            let stringruletype = f
+                .get("stringruletype")
+                .and_then(|v| v.as_i64())
+                .ok_or("filters[].stringruletype is required")?;
+            let values: Vec<Value> = f
+                .get("stringrulevalues")
+                .and_then(|v| v.as_array())
+                .ok_or("filters[].stringrulevalues is required")?
+                .iter()
+                .filter_map(|v| v.as_str())
+                .map(|v| json!({ "value": v, "label": v }))
+                .collect();
+            filters.push(json!({
+                "fieldname": fieldname,
+                "stringruletype": stringruletype,
+                "stringrulevalues": values,
+            }));
+        }
+    }
+
     let mut params: Vec<(String, String)> = Vec::new();
     if let Some(obj) = args.get("parameters").and_then(|v| v.as_object()) {
         for (k, v) in obj {
@@ -847,7 +887,7 @@ async fn exec_run_report(args: &Value, client: &HaloPSAClient) -> Result<String,
         }
     }
 
-    let result = client.run_report(report_id, &params).await?;
+    let result = client.run_report(report_id, &filters, &params).await?;
 
     let rows = result
         .get("report")
@@ -860,6 +900,7 @@ async fn exec_run_report(args: &Value, client: &HaloPSAClient) -> Result<String,
         "report_id": report_id,
         "name": result.get("name"),
         "columns": result.get("available_columns"),
+        "filterable_columns": result.get("filterable_columns"),
         "applied_filters": result.get("filters"),
         "row_count": row_count,
         "rows": rows,

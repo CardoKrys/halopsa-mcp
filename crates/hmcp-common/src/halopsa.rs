@@ -442,14 +442,17 @@ impl HaloPSAClient {
     }
 
     /// Run a saved report by ID and return the full response, including
-    /// the executed rows under `report.rows`. `extra_params` carries
-    /// report-specific filters (e.g. a report might take "clientname") —
-    /// these vary per report, confirmed against a real report execution
-    /// in the agent UI, so they're passed through generically rather than
-    /// hardcoded.
+    /// the executed rows under `report.rows`. `filters` overrides the
+    /// report's saved filters — confirmed against the agent UI's own
+    /// request when changing a report filter and re-running: a JSON array
+    /// of `{fieldname, stringruletype, stringrulevalues}` objects (the
+    /// same shape as the `filters` field in a report's own definition).
+    /// `extra_params` carries any other report-specific query params
+    /// (e.g. a report might take "clientname") passed through generically.
     pub async fn run_report(
         &self,
         report_id: i64,
+        filters: &[Value],
         extra_params: &[(String, String)],
     ) -> Result<Value, String> {
         let mut params: Vec<(&str, String)> = vec![
@@ -457,6 +460,9 @@ impl HaloPSAClient {
             ("loadreport", "true".into()),
             ("dontloadsystemreport", "false".into()),
         ];
+        if !filters.is_empty() {
+            params.push(("filters", json!(filters).to_string()));
+        }
         for (k, v) in extra_params {
             params.push((k.as_str(), v.clone()));
         }
