@@ -502,6 +502,39 @@ pub fn tool_definitions() -> Vec<Value> {
                 "required": ["site_id"]
             }
         }),
+        json!({
+            "name": "list_agents",
+            "description": "List agents (staff members). Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "list_asset_groups",
+            "description": "List asset groups. Returns paginated results.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_asset_group",
+            "description": "Get full details of a single asset group by ID.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "asset_group_id": { "type": "integer", "description": "The asset group ID" }
+                },
+                "required": ["asset_group_id"]
+            }
+        }),
     ]
 }
 
@@ -581,6 +614,9 @@ pub async fn execute_tool(
         "get_site" => exec_get_site(args, client).await,
         "create_site" => exec_create_site(args, client).await,
         "update_site" => exec_update_site(args, client).await,
+        "list_agents" => exec_list_agents(args, client).await,
+        "list_asset_groups" => exec_list_asset_groups(args, client).await,
+        "get_asset_group" => exec_get_asset_group(args, client).await,
         "run_report" => exec_run_report(args, client).await,
         "get_me" => exec_get_me(client).await,
         "get_ticket_assets" => exec_get_ticket_assets(args, client).await,
@@ -1260,6 +1296,46 @@ async fn exec_update_site(args: &Value, client: &HaloPSAClient) -> Result<String
     }
 
     let result = client.update_site(site_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_agents(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (agents, total) = client.list_agents(page, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "agents": agents,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_list_asset_groups(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (groups, total) = client.list_asset_groups(page, page_size).await?;
+
+    Ok(serde_json::to_string_pretty(&json!({
+        "asset_groups": groups,
+        "total_count": total,
+        "page": page,
+        "page_size": page_size,
+    }))
+    .unwrap())
+}
+
+async fn exec_get_asset_group(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let asset_group_id = args
+        .get("asset_group_id")
+        .and_then(|v| v.as_i64())
+        .ok_or("asset_group_id is required")?;
+
+    let result = client.get_asset_group(asset_group_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 

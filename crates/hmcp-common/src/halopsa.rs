@@ -647,6 +647,45 @@ impl HaloPSAClient {
         self.post("/api/Site", &json!([fields])).await
     }
 
+    /// List agents (staff members). Same base path as the existing,
+    /// already-confirmed get_agent single-record endpoint.
+    pub async fn list_agents(&self, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        let value = self.get_raw("/api/Agent", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    /// List asset groups. Endpoint path follows HaloPSA's singular
+    /// resource-name convention (TicketType, AssetType) — NOT confirmed
+    /// against a real capture, flag for retest.
+    pub async fn list_asset_groups(&self, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        let value = self.get_raw("/api/AssetGroup", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    /// Get a single asset group by ID. Same endpoint-guess caveat as
+    /// list_asset_groups.
+    pub async fn get_asset_group(&self, group_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/AssetGroup/{group_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
     // --- Internal HTTP methods ---
 
     async fn get_raw(
