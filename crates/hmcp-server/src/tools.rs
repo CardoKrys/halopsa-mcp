@@ -139,7 +139,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_my_tickets",
-            "description": "List tickets assigned to the authenticated agent. Resolves your own agent ID via get_me (best-effort — if identity resolution fails, this will error; fall back to list_tickets with an explicit agent_id in that case).",
+            "description": "List tickets assigned to the authenticated agent. Resolves your own agent ID via get_me.",
             "inputSchema": {
                 "type": "object",
                 "properties": {

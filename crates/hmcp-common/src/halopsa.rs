@@ -558,14 +558,17 @@ impl HaloPSAClient {
         self.get_no_params(&format!("/api/Agent/{agent_id}")).await
     }
 
-    /// Get current user info. /api/AuthInfo only returns server/tenant
-    /// metadata (auth_url, integrationServiceUrl, tenant_id) on this
-    /// instance, not the agent's own identity. HaloPSA's OAuth server
-    /// issues JWT access tokens, so as a best-effort enrichment we decode
-    /// the token's claims (no signature verification needed — we only use
-    /// this for display, HaloPSA itself still enforces authorization on
-    /// every request) to surface agent id/name/email when present.
+    /// Get current user (agent) info. Confirmed against the agent UI:
+    /// it calls /api/agent/me on every page load to resolve the logged-in
+    /// agent's identity — the same mechanism the app itself uses. This
+    /// replaces the previous best-effort approach (decoding JWT claims
+    /// from the access token, since /api/AuthInfo only returns server/
+    /// tenant metadata, not agent identity). Falls back to that old
+    /// approach if /api/agent/me fails for any reason.
     pub async fn get_me(&self) -> Result<Value, String> {
+        if let Ok(result) = self.get_no_params("/api/agent/me").await {
+            return Ok(result);
+        }
         let mut result = self.get_no_params("/api/AuthInfo").await?;
         if let Some(claims) = decode_jwt_claims(&self.access_token) {
             if let Some(obj) = result.as_object_mut() {
