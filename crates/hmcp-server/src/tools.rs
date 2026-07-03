@@ -423,6 +423,399 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "list_roles",
+            "description": "List access-control roles. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_role",
+            "description": "Get full details of a single role by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "role_id": { "type": "integer", "description": "The role ID" } },
+                "required": ["role_id"]
+            }
+        }),
+        json!({
+            "name": "create_role",
+            "description": "Create a new access-control role. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Role fields, e.g. { \"name\": \"L2 Support\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "update_role",
+            "description": "Update an existing role's fields. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "role_id": { "type": "integer", "description": "The role ID" },
+                    "fields": { "type": "object", "description": "Fields to update" }
+                },
+                "required": ["role_id", "fields"]
+            }
+        }),
+        json!({
+            "name": "delete_role",
+            "description": "Delete a role by ID. WARNING: permanently removes it; agents assigned this role may lose permissions. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "role_id": { "type": "integer", "description": "The role ID" } },
+                "required": ["role_id"]
+            }
+        }),
+        json!({
+            "name": "list_tags",
+            "description": "List tags used to categorize tickets, assets, clients, etc.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "search": { "type": "string", "description": "Search tags by name (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_tag",
+            "description": "Get a single tag by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "tag_id": { "type": "integer", "description": "The tag ID" } },
+                "required": ["tag_id"]
+            }
+        }),
+        json!({
+            "name": "create_tag",
+            "description": "Create a new tag. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Tag fields, e.g. { \"text\": \"VIP\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "delete_tag",
+            "description": "Delete a tag by ID. WARNING: permanently removes it and detaches it from all records. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "tag_id": { "type": "integer", "description": "The tag ID" } },
+                "required": ["tag_id"]
+            }
+        }),
+        json!({
+            "name": "list_item_groups",
+            "description": "List item groups/categories used to organise the product catalogue. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-200, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_item_group",
+            "description": "Get a single item group by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "group_id": { "type": "integer", "description": "The item group ID" } },
+                "required": ["group_id"]
+            }
+        }),
+        json!({
+            "name": "create_item_group",
+            "description": "Create a new item group. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Group fields, e.g. { \"name\": \"Networking Equipment\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "delete_item_group",
+            "description": "Delete an item group by ID. Items in the group are not deleted, only ungrouped. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "group_id": { "type": "integer", "description": "The item group ID" } },
+                "required": ["group_id"]
+            }
+        }),
+        json!({
+            "name": "list_items",
+            "description": "List catalogue items (products/parts used in quotations, invoices, purchase orders). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "search": { "type": "string", "description": "Search by name or description (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-200, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_item",
+            "description": "Get a single catalogue item by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "item_id": { "type": "integer", "description": "The item ID" } },
+                "required": ["item_id"]
+            }
+        }),
+        json!({
+            "name": "create_item",
+            "description": "Create a new catalogue item. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Item fields, e.g. { \"name\": \"USB-C Hub\", \"unit_price\": 49.99 }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "list_item_stock",
+            "description": "List stock levels for catalogue items. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "item_id": { "type": "integer", "description": "Filter by item ID (optional)" } }
+            }
+        }),
+        json!({
+            "name": "list_products",
+            "description": "List products (sellable bundles). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "search": { "type": "string", "description": "Search by name or description (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_product",
+            "description": "Get a single product by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "product_id": { "type": "integer", "description": "The product ID" } },
+                "required": ["product_id"]
+            }
+        }),
+        json!({
+            "name": "create_product",
+            "description": "Create a new product. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Product fields, e.g. { \"name\": \"Standard Laptop Bundle\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "delete_product",
+            "description": "Delete a product by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "product_id": { "type": "integer", "description": "The product ID" } },
+                "required": ["product_id"]
+            }
+        }),
+        json!({
+            "name": "list_product_components",
+            "description": "List the components (items) that make up a product bundle. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "product_id": { "type": "integer", "description": "Filter by product ID (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "create_product_component",
+            "description": "Add a component (item) to a product bundle. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"product_id\": 5, \"item_id\": 12, \"quantity\": 1 }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "list_quotations",
+            "description": "List quotations/quotes. Returns paginated results. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "client_id": { "type": "integer", "description": "Filter by client ID (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-200, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_quotation",
+            "description": "Get full details of a single quotation by ID, including line items. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "quotation_id": { "type": "integer", "description": "The quotation ID" } },
+                "required": ["quotation_id"]
+            }
+        }),
+        json!({
+            "name": "create_quotation",
+            "description": "Create a new quotation. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Quotation fields, e.g. { \"client_id\": 1, \"title\": \"Office Refresh\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "update_quotation_lines",
+            "description": "Update line items on an existing quotation. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "quotation_id": { "type": "integer", "description": "The quotation ID" },
+                    "lines": { "type": "array", "description": "Updated line items", "items": { "type": "object" } }
+                },
+                "required": ["quotation_id", "lines"]
+            }
+        }),
+        json!({
+            "name": "approve_quotation",
+            "description": "Approve or reject a quotation. May trigger downstream invoice/sales order creation. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "quotation_id": { "type": "integer", "description": "The quotation ID" },
+                    "approved": { "type": "boolean", "description": "true to approve, false to reject" },
+                    "notes": { "type": "string", "description": "Optional approval note" }
+                },
+                "required": ["quotation_id", "approved"]
+            }
+        }),
+        json!({
+            "name": "view_quotation",
+            "description": "Get a presentation-ready view of a quotation (same data as get_quotation — no distinct rendered-view endpoint was found).",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "quotation_id": { "type": "integer", "description": "The quotation ID" } },
+                "required": ["quotation_id"]
+            }
+        }),
+        json!({
+            "name": "list_timesheets",
+            "description": "List timesheet entries across agents. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "agent_id": { "type": "integer", "description": "Filter by agent ID (optional)" } }
+            }
+        }),
+        json!({
+            "name": "get_my_timesheets",
+            "description": "Get timesheet entries for the currently authenticated agent. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "get_timesheet",
+            "description": "Get a single timesheet entry by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "timesheet_id": { "type": "integer", "description": "The timesheet entry ID" } },
+                "required": ["timesheet_id"]
+            }
+        }),
+        json!({
+            "name": "create_timesheet",
+            "description": "Create a new timesheet entry. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"agent_id\": 5, \"hours\": 1.5, \"ticket_id\": 1234 }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "get_invoice",
+            "description": "Get full details of a single invoice by ID, including line items.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "invoice_id": { "type": "integer", "description": "The invoice ID" } },
+                "required": ["invoice_id"]
+            }
+        }),
+        json!({
+            "name": "list_invoice_lines",
+            "description": "List invoice line items for a specific invoice, or across recent invoices if no invoice_id given.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "invoice_id": { "type": "integer", "description": "Filter to a specific invoice (optional)" } }
+            }
+        }),
+        json!({
+            "name": "create_asset_group",
+            "description": "Create a new asset group. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Group fields, e.g. { \"name\": \"Server Room A\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "update_asset_group",
+            "description": "Update an existing asset group's fields. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "group_id": { "type": "integer", "description": "The asset group ID" },
+                    "fields": { "type": "object", "description": "Fields to update" }
+                },
+                "required": ["group_id", "fields"]
+            }
+        }),
+        json!({
+            "name": "delete_asset_group",
+            "description": "Delete an asset group by ID. Assets in the group are not deleted, only ungrouped. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "group_id": { "type": "integer", "description": "The asset group ID" } },
+                "required": ["group_id"]
+            }
+        }),
+        json!({
+            "name": "list_attachments",
+            "description": "List attachment metadata, optionally scoped to a ticket. Does not fetch file bytes. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "ticket_id": { "type": "integer", "description": "Filter by ticket ID (optional)" } }
+            }
+        }),
+        json!({
+            "name": "get_attachment",
+            "description": "Get attachment metadata by ID (filename, size, MIME type) — does not fetch file bytes. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "attachment_id": { "type": "integer", "description": "The attachment ID" } },
+                "required": ["attachment_id"]
+            }
+        }),
+        json!({
+            "name": "delete_attachment",
+            "description": "Delete an attachment by ID. WARNING: permanently removes the file. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "attachment_id": { "type": "integer", "description": "The attachment ID" } },
+                "required": ["attachment_id"]
+            }
+        }),
+        json!({
             "name": "update_client",
             "description": "Update an existing client's fields (name, contact details, custom fields).",
             "inputSchema": {
@@ -1122,6 +1515,47 @@ pub async fn execute_tool(
         "get_status_details" => exec_get_status_details(args, client).await,
         "global_search" => exec_global_search(args, client).await,
         "list_field_groups" => exec_list_field_groups(client).await,
+        "list_roles" => exec_list_roles(args, client).await,
+        "get_role" => exec_get_role(args, client).await,
+        "create_role" => exec_create_role(args, client).await,
+        "update_role" => exec_update_role(args, client).await,
+        "delete_role" => exec_delete_role(args, client).await,
+        "list_tags" => exec_list_tags(args, client).await,
+        "get_tag" => exec_get_tag(args, client).await,
+        "create_tag" => exec_create_tag(args, client).await,
+        "delete_tag" => exec_delete_tag(args, client).await,
+        "list_item_groups" => exec_list_item_groups(args, client).await,
+        "get_item_group" => exec_get_item_group(args, client).await,
+        "create_item_group" => exec_create_item_group(args, client).await,
+        "delete_item_group" => exec_delete_item_group(args, client).await,
+        "list_items" => exec_list_items(args, client).await,
+        "get_item" => exec_get_item(args, client).await,
+        "create_item" => exec_create_item(args, client).await,
+        "list_item_stock" => exec_list_item_stock(args, client).await,
+        "list_products" => exec_list_products(args, client).await,
+        "get_product" => exec_get_product(args, client).await,
+        "create_product" => exec_create_product(args, client).await,
+        "delete_product" => exec_delete_product(args, client).await,
+        "list_product_components" => exec_list_product_components(args, client).await,
+        "create_product_component" => exec_create_product_component(args, client).await,
+        "list_quotations" => exec_list_quotations(args, client).await,
+        "get_quotation" => exec_get_quotation(args, client).await,
+        "create_quotation" => exec_create_quotation(args, client).await,
+        "update_quotation_lines" => exec_update_quotation_lines(args, client).await,
+        "approve_quotation" => exec_approve_quotation(args, client).await,
+        "view_quotation" => exec_view_quotation(args, client).await,
+        "list_timesheets" => exec_list_timesheets(args, client).await,
+        "get_my_timesheets" => exec_get_my_timesheets(client).await,
+        "get_timesheet" => exec_get_timesheet(args, client).await,
+        "create_timesheet" => exec_create_timesheet(args, client).await,
+        "get_invoice" => exec_get_invoice(args, client).await,
+        "list_invoice_lines" => exec_list_invoice_lines(args, client).await,
+        "create_asset_group" => exec_create_asset_group(args, client).await,
+        "update_asset_group" => exec_update_asset_group(args, client).await,
+        "delete_asset_group" => exec_delete_asset_group(args, client).await,
+        "list_attachments" => exec_list_attachments(args, client).await,
+        "get_attachment" => exec_get_attachment(args, client).await,
+        "delete_attachment" => exec_delete_attachment(args, client).await,
         "update_client" => exec_update_client(args, client).await,
         "list_asset_types" => exec_list_asset_types(client).await,
         "search_agents" => exec_search_agents(args, client).await,
@@ -1650,6 +2084,272 @@ async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<Stri
 async fn exec_list_field_groups(client: &HaloPSAClient) -> Result<String, String> {
     let groups = client.list_field_groups().await?;
     Ok(serde_json::to_string_pretty(&json!({ "field_groups": groups })).unwrap())
+}
+
+async fn exec_list_roles(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (roles, total) = client.list_roles(page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "roles": roles, "total_count": total, "page": page, "page_size": page_size })).unwrap())
+}
+
+async fn exec_get_role(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let role_id = args.get("role_id").and_then(|v| v.as_i64()).ok_or("role_id is required")?;
+    let result = client.get_role(role_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_role(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_role(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_role(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let role_id = args.get("role_id").and_then(|v| v.as_i64()).ok_or("role_id is required")?;
+    let fields = args.get("fields").cloned().unwrap_or(json!({}));
+    let result = client.update_role(role_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_role(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let role_id = args.get("role_id").and_then(|v| v.as_i64()).ok_or("role_id is required")?;
+    client.delete_role(role_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "role_id": role_id })).unwrap())
+}
+
+async fn exec_list_tags(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let search = args.get("search").and_then(|v| v.as_str());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let tags = client.list_tags(search, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "tags": tags })).unwrap())
+}
+
+async fn exec_get_tag(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let tag_id = args.get("tag_id").and_then(|v| v.as_i64()).ok_or("tag_id is required")?;
+    let result = client.get_tag(tag_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_tag(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_tag(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_tag(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let tag_id = args.get("tag_id").and_then(|v| v.as_i64()).ok_or("tag_id is required")?;
+    client.delete_tag(tag_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "tag_id": tag_id })).unwrap())
+}
+
+async fn exec_list_item_groups(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let groups = client.list_item_groups(page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "item_groups": groups })).unwrap())
+}
+
+async fn exec_get_item_group(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let group_id = args.get("group_id").and_then(|v| v.as_i64()).ok_or("group_id is required")?;
+    let result = client.get_item_group(group_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_item_group(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_item_group(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_item_group(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let group_id = args.get("group_id").and_then(|v| v.as_i64()).ok_or("group_id is required")?;
+    client.delete_item_group(group_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "group_id": group_id })).unwrap())
+}
+
+async fn exec_list_items(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let search = args.get("search").and_then(|v| v.as_str());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (items, total) = client.list_items(search, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "items": items, "total_count": total, "page": page, "page_size": page_size })).unwrap())
+}
+
+async fn exec_get_item(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let item_id = args.get("item_id").and_then(|v| v.as_i64()).ok_or("item_id is required")?;
+    let result = client.get_item(item_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_item(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_item(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_item_stock(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let item_id = args.get("item_id").and_then(|v| v.as_i64());
+    let stock = client.list_item_stock(item_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "item_stock": stock })).unwrap())
+}
+
+async fn exec_list_products(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let search = args.get("search").and_then(|v| v.as_str());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let products = client.list_products(search, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "products": products })).unwrap())
+}
+
+async fn exec_get_product(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let product_id = args.get("product_id").and_then(|v| v.as_i64()).ok_or("product_id is required")?;
+    let result = client.get_product(product_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_product(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_product(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_product(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let product_id = args.get("product_id").and_then(|v| v.as_i64()).ok_or("product_id is required")?;
+    client.delete_product(product_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "product_id": product_id })).unwrap())
+}
+
+async fn exec_list_product_components(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let product_id = args.get("product_id").and_then(|v| v.as_i64());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let components = client.list_product_components(product_id, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "components": components })).unwrap())
+}
+
+async fn exec_create_product_component(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_product_component(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_quotations(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let client_id = args.get("client_id").and_then(|v| v.as_i64());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+
+    let (quotations, total) = client.list_quotations(client_id, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "quotations": quotations, "total_count": total, "page": page, "page_size": page_size })).unwrap())
+}
+
+async fn exec_get_quotation(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let quotation_id = args.get("quotation_id").and_then(|v| v.as_i64()).ok_or("quotation_id is required")?;
+    let result = client.get_quotation(quotation_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_quotation(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_quotation(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_quotation_lines(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let quotation_id = args.get("quotation_id").and_then(|v| v.as_i64()).ok_or("quotation_id is required")?;
+    let lines = args.get("lines").cloned().ok_or("lines is required")?;
+    let result = client.update_quotation_lines(quotation_id, lines).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_approve_quotation(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let quotation_id = args.get("quotation_id").and_then(|v| v.as_i64()).ok_or("quotation_id is required")?;
+    let approved = args.get("approved").and_then(|v| v.as_bool()).ok_or("approved is required")?;
+    let notes = args.get("notes").and_then(|v| v.as_str());
+    let result = client.approve_quotation(quotation_id, approved, notes).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_view_quotation(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let quotation_id = args.get("quotation_id").and_then(|v| v.as_i64()).ok_or("quotation_id is required")?;
+    let result = client.view_quotation(quotation_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_timesheets(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let agent_id = args.get("agent_id").and_then(|v| v.as_i64());
+    let entries = client.list_timesheets(agent_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "timesheets": entries })).unwrap())
+}
+
+async fn exec_get_my_timesheets(client: &HaloPSAClient) -> Result<String, String> {
+    let entries = client.get_my_timesheets().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "timesheets": entries })).unwrap())
+}
+
+async fn exec_get_timesheet(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let timesheet_id = args.get("timesheet_id").and_then(|v| v.as_i64()).ok_or("timesheet_id is required")?;
+    let result = client.get_timesheet(timesheet_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_timesheet(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_timesheet(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_invoice(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let invoice_id = args.get("invoice_id").and_then(|v| v.as_i64()).ok_or("invoice_id is required")?;
+    let result = client.get_invoice(invoice_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_invoice_lines(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let invoice_id = args.get("invoice_id").and_then(|v| v.as_i64());
+    let lines = client.list_invoice_lines(invoice_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "lines": lines })).unwrap())
+}
+
+async fn exec_create_asset_group(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_asset_group(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_asset_group(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let group_id = args.get("group_id").and_then(|v| v.as_i64()).ok_or("group_id is required")?;
+    let fields = args.get("fields").cloned().unwrap_or(json!({}));
+    let result = client.update_asset_group(group_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_asset_group(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let group_id = args.get("group_id").and_then(|v| v.as_i64()).ok_or("group_id is required")?;
+    client.delete_asset_group(group_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "group_id": group_id })).unwrap())
+}
+
+async fn exec_list_attachments(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let ticket_id = args.get("ticket_id").and_then(|v| v.as_i64());
+    let attachments = client.list_attachments(ticket_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "attachments": attachments })).unwrap())
+}
+
+async fn exec_get_attachment(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let attachment_id = args.get("attachment_id").and_then(|v| v.as_i64()).ok_or("attachment_id is required")?;
+    let result = client.get_attachment(attachment_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_attachment(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let attachment_id = args.get("attachment_id").and_then(|v| v.as_i64()).ok_or("attachment_id is required")?;
+    client.delete_attachment(attachment_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "attachment_id": attachment_id })).unwrap())
 }
 
 async fn exec_update_client(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

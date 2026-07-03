@@ -863,6 +863,327 @@ impl HaloPSAClient {
         self.get_raw(&format!("/api/Report/{report_id}"), &params).await
     }
 
+    // --- Roles (endpoints guessed from HaloPSA's naming convention; NOT
+    // confirmed against a real capture, flag for retest) ---
+
+    pub async fn list_roles(&self, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        let value = self.get_raw("/api/Role", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    pub async fn get_role(&self, role_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Role/{role_id}"), &[("includedetails", "true".into())]).await
+    }
+
+    pub async fn create_role(&self, role: Value) -> Result<Value, String> {
+        self.post("/api/Role", &json!([role])).await
+    }
+
+    pub async fn update_role(&self, role_id: i64, mut fields: Value) -> Result<Value, String> {
+        if let Some(obj) = fields.as_object_mut() {
+            obj.insert("id".into(), json!(role_id));
+        }
+        self.post("/api/Role", &json!([fields])).await
+    }
+
+    pub async fn delete_role(&self, role_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/Role/{role_id}"), &[]).await
+    }
+
+    // --- Tags (endpoint name confirmed by a permission-denied response
+    // from a third-party connector's account: /api/Tags. Params/shape
+    // unconfirmed) ---
+
+    pub async fn list_tags(&self, search: Option<&str>, page: i64, page_size: i64) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(s) = search {
+            params.push(("search", s.to_string()));
+        }
+        let value = self.get_raw("/api/Tags", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_tag(&self, tag_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Tags/{tag_id}"), &[]).await
+    }
+
+    pub async fn create_tag(&self, tag: Value) -> Result<Value, String> {
+        self.post("/api/Tags", &json!([tag])).await
+    }
+
+    pub async fn delete_tag(&self, tag_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/Tags/{tag_id}"), &[]).await
+    }
+
+    // --- Item Groups / Items / Item Stock (endpoints guessed from
+    // HaloPSA's naming convention; NOT confirmed against a real capture) ---
+
+    pub async fn list_item_groups(&self, page: i64, page_size: i64) -> Result<Vec<Value>, String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(200).to_string()),
+        ];
+        let value = self.get_raw("/api/ItemGroup", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_item_group(&self, group_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/ItemGroup/{group_id}"), &[]).await
+    }
+
+    pub async fn create_item_group(&self, group: Value) -> Result<Value, String> {
+        self.post("/api/ItemGroup", &json!([group])).await
+    }
+
+    pub async fn delete_item_group(&self, group_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/ItemGroup/{group_id}"), &[]).await
+    }
+
+    pub async fn list_items(&self, search: Option<&str>, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(200).to_string()),
+        ];
+        if let Some(s) = search {
+            params.push(("search", s.to_string()));
+        }
+        let value = self.get_raw("/api/Item", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    pub async fn get_item(&self, item_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Item/{item_id}"), &[("includedetails", "true".into())]).await
+    }
+
+    pub async fn create_item(&self, item: Value) -> Result<Value, String> {
+        self.post("/api/Item", &json!([item])).await
+    }
+
+    pub async fn list_item_stock(&self, item_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = item_id {
+            params.push(("item_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/ItemStock", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    // --- Products & Components (endpoints guessed from HaloPSA's naming
+    // convention; NOT confirmed against a real capture) ---
+
+    pub async fn list_products(&self, search: Option<&str>, page: i64, page_size: i64) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(s) = search {
+            params.push(("search", s.to_string()));
+        }
+        let value = self.get_raw("/api/Product", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_product(&self, product_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Product/{product_id}"), &[("includedetails", "true".into())]).await
+    }
+
+    pub async fn create_product(&self, product: Value) -> Result<Value, String> {
+        self.post("/api/Product", &json!([product])).await
+    }
+
+    pub async fn delete_product(&self, product_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/Product/{product_id}"), &[]).await
+    }
+
+    pub async fn list_product_components(
+        &self,
+        product_id: Option<i64>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(id) = product_id {
+            params.push(("product_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/ProductComponent", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn create_product_component(&self, component: Value) -> Result<Value, String> {
+        self.post("/api/ProductComponent", &json!([component])).await
+    }
+
+    // --- Quotations (endpoints guessed from HaloPSA's naming convention;
+    // NOT confirmed against a real capture) ---
+
+    pub async fn list_quotations(
+        &self,
+        client_id: Option<i64>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(200).to_string()),
+        ];
+        if let Some(id) = client_id {
+            params.push(("client_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Quotation", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    pub async fn get_quotation(&self, quotation_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Quotation/{quotation_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    pub async fn create_quotation(&self, quotation: Value) -> Result<Value, String> {
+        self.post("/api/Quotation", &json!([quotation])).await
+    }
+
+    pub async fn update_quotation_lines(&self, quotation_id: i64, lines: Value) -> Result<Value, String> {
+        let body = json!({ "id": quotation_id, "lines": lines });
+        self.post("/api/Quotation", &json!([body])).await
+    }
+
+    pub async fn approve_quotation(&self, quotation_id: i64, approved: bool, notes: Option<&str>) -> Result<Value, String> {
+        let mut body = json!({ "id": quotation_id, "approvalstate": if approved { 2 } else { 3 } });
+        if let Some(n) = notes {
+            if let Some(obj) = body.as_object_mut() {
+                obj.insert("approvalnote".into(), json!(n));
+            }
+        }
+        self.post("/api/Quotation", &json!([body])).await
+    }
+
+    /// View a quotation in presentation form. No distinct "rendered view"
+    /// endpoint was found — thin wrapper over get_quotation.
+    pub async fn view_quotation(&self, quotation_id: i64) -> Result<Value, String> {
+        self.get_quotation(quotation_id).await
+    }
+
+    // --- Timesheets (endpoint guessed from HaloPSA's naming convention;
+    // NOT confirmed against a real capture. StackJack's reference shape
+    // for this area looked like a per-day target-vs-actual rollup rather
+    // than discrete loggable entries, so get_timesheet/create_timesheet
+    // are higher-risk guesses than list_timesheets/get_my_timesheets) ---
+
+    pub async fn list_timesheets(&self, agent_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = agent_id {
+            params.push(("agent_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Timesheet", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_my_timesheets(&self) -> Result<Vec<Value>, String> {
+        let value = self.get_raw("/api/Timesheet", &[("mine", "true".into())]).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_timesheet(&self, timesheet_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Timesheet/{timesheet_id}"), &[]).await
+    }
+
+    pub async fn create_timesheet(&self, entry: Value) -> Result<Value, String> {
+        self.post("/api/Timesheet", &json!([entry])).await
+    }
+
+    // --- Invoices (remaining items) ---
+
+    /// Get a single invoice by ID. Same base path as the confirmed
+    /// list_invoices.
+    pub async fn get_invoice(&self, invoice_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Invoice/{invoice_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    /// List invoice line items — for a specific invoice if given, else
+    /// falls back to the same flattened-across-recent-invoices approach as
+    /// list_billing_lines.
+    pub async fn list_invoice_lines(&self, invoice_id: Option<i64>) -> Result<Vec<Value>, String> {
+        if let Some(id) = invoice_id {
+            let invoice = self.get_invoice(id).await?;
+            return Ok(invoice
+                .get("lines")
+                .and_then(|l| l.as_array())
+                .cloned()
+                .unwrap_or_default());
+        }
+        let (lines, _) = self.list_billing_lines(1, 50).await?;
+        Ok(lines)
+    }
+
+    // --- Asset Groups (remaining write operations). Same endpoint-guess
+    // caveat as the existing list_asset_groups/get_asset_group ---
+
+    pub async fn create_asset_group(&self, group: Value) -> Result<Value, String> {
+        self.post("/api/AssetGroup", &json!([group])).await
+    }
+
+    pub async fn update_asset_group(&self, group_id: i64, mut fields: Value) -> Result<Value, String> {
+        if let Some(obj) = fields.as_object_mut() {
+            obj.insert("id".into(), json!(group_id));
+        }
+        self.post("/api/AssetGroup", &json!([fields])).await
+    }
+
+    pub async fn delete_asset_group(&self, group_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/AssetGroup/{group_id}"), &[]).await
+    }
+
+    // --- Attachments (metadata only — upload/download/binary variants
+    // deferred, they need blob/base64 handling rather than a plain JSON
+    // call. Endpoint guessed from HaloPSA's naming convention) ---
+
+    pub async fn list_attachments(&self, ticket_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = ticket_id {
+            params.push(("ticket_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Attachment", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_attachment(&self, attachment_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Attachment/{attachment_id}"), &[]).await
+    }
+
+    pub async fn delete_attachment(&self, attachment_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/Attachment/{attachment_id}"), &[]).await
+    }
+
     /// List teams/queues.
     pub async fn list_teams(&self) -> Result<Vec<Value>, String> {
         let value = self.get_no_params("/api/Team").await?;
