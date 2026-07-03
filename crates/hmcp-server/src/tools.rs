@@ -423,6 +423,26 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "create_client",
+            "description": "Create a new client (customer organization). Reuses the same confirmed /api/Client base path as get_client/list_clients.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Client fields, e.g. { \"name\": \"Acme Corp\", \"website\": \"https://acme.com\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "list_invoice_payments",
+            "description": "List payments recorded against invoices. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "invoice_id": { "type": "integer", "description": "Filter by invoice ID (optional)" },
+                    "count": { "type": "integer", "description": "Number of results (default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
             "name": "list_workflows",
             "description": "List workflows (multi-step processes for ticket handling). Uses the same base path as the already-confirmed get_available_actions/list_workflow_steps.",
             "inputSchema": {
@@ -1931,6 +1951,8 @@ pub async fn execute_tool(
         "get_status_details" => exec_get_status_details(args, client).await,
         "global_search" => exec_global_search(args, client).await,
         "list_field_groups" => exec_list_field_groups(client).await,
+        "create_client" => exec_create_client(args, client).await,
+        "list_invoice_payments" => exec_list_invoice_payments(args, client).await,
         "list_workflows" => exec_list_workflows(args, client).await,
         "get_workflow" => exec_get_workflow(args, client).await,
         "create_workflow" => exec_create_workflow(args, client).await,
@@ -2545,6 +2567,19 @@ async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<Stri
 async fn exec_list_field_groups(client: &HaloPSAClient) -> Result<String, String> {
     let groups = client.list_field_groups().await?;
     Ok(serde_json::to_string_pretty(&json!({ "field_groups": groups })).unwrap())
+}
+
+async fn exec_create_client(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_client(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_invoice_payments(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let invoice_id = args.get("invoice_id").and_then(|v| v.as_i64());
+    let count = args.get("count").and_then(|v| v.as_i64()).unwrap_or(50);
+    let payments = client.list_invoice_payments(invoice_id, count).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "payments": payments })).unwrap())
 }
 
 async fn exec_list_workflows(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

@@ -863,6 +863,23 @@ impl HaloPSAClient {
         self.get_raw(&format!("/api/Report/{report_id}"), &params).await
     }
 
+    /// Create a new client. Reuses the same confirmed /api/Client base
+    /// path as get_client/list_clients.
+    pub async fn create_client(&self, client_data: Value) -> Result<Value, String> {
+        self.post("/api/Client", &json!([client_data])).await
+    }
+
+    /// List payments recorded against invoices. Endpoint guessed from
+    /// HaloPSA's naming convention — NOT confirmed against a real capture.
+    pub async fn list_invoice_payments(&self, invoice_id: Option<i64>, count: i64) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![("count", count.max(1).min(200).to_string())];
+        if let Some(id) = invoice_id {
+            params.push(("invoice_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/InvoicePayment", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
     // --- Workflows (list/get reuse the already-confirmed /api/Workflow
     // base path used internally by the existing get_workflow/
     // list_workflow_steps; write operations are unconfirmed) ---
