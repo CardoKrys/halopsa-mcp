@@ -423,6 +423,235 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "list_asset_changes",
+            "description": "List change history for assets (audit trail). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "asset_id": { "type": "integer", "description": "Filter by asset ID (optional)" },
+                    "count": { "type": "integer", "description": "Max results (default 200)", "default": 200 }
+                }
+            }
+        }),
+        json!({
+            "name": "list_device_licences",
+            "description": "List software licences assigned to a device/asset. Reuses the same base path as list_software_licences with a device filter.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "device_id": { "type": "integer", "description": "Filter by device/asset ID (optional)" } }
+            }
+        }),
+        json!({
+            "name": "create_invoice",
+            "description": "Create a new invoice. Reuses the same confirmed /api/Invoice base path as list_invoices/get_invoice.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Invoice fields, e.g. { \"client_id\": 1, \"lines\": [...] }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "void_invoice",
+            "description": "Void an existing invoice. WARNING: cannot be undone. Field name for voiding is guessed — unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "invoice_id": { "type": "integer", "description": "The invoice ID to void" } },
+                "required": ["invoice_id"]
+            }
+        }),
+        json!({
+            "name": "list_suppliers",
+            "description": "List suppliers/vendors. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "count": { "type": "integer", "description": "Number of results (default 50)", "default": 50 } }
+            }
+        }),
+        json!({
+            "name": "get_supplier",
+            "description": "Get full details of a single supplier by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "supplier_id": { "type": "integer", "description": "The supplier ID" } },
+                "required": ["supplier_id"]
+            }
+        }),
+        json!({
+            "name": "create_supplier",
+            "description": "Create a new supplier/vendor record. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Supplier fields, e.g. { \"name\": \"Acme Hardware Inc.\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "create_supplier_user",
+            "description": "Create a new supplier-side contact attached to a supplier. Payload shape informed by a third-party connector's documented behavior (suppliers are Users under the hood) — not confirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "supplier_id": { "type": "integer", "description": "The supplier ID this user belongs to" },
+                    "supplier_name": { "type": "string", "description": "The supplier's display name (must match the supplier record)" },
+                    "fields": { "type": "object", "description": "User fields, e.g. { \"firstname\": \"Jane\", \"lastname\": \"Doe\", \"emailaddress\": \"jane@acme.com\" }" }
+                },
+                "required": ["supplier_id", "supplier_name", "fields"]
+            }
+        }),
+        json!({
+            "name": "list_sales_orders",
+            "description": "List sales orders. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "client_id": { "type": "integer", "description": "Filter by client ID (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_sales_order",
+            "description": "Get full details of a single sales order by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "sales_order_id": { "type": "integer", "description": "The sales order ID" } },
+                "required": ["sales_order_id"]
+            }
+        }),
+        json!({
+            "name": "create_sales_order",
+            "description": "Create a new sales order. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"client_id\": 1, \"lines\": [...] }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "get_audit_entry",
+            "description": "Get a single audit log entry by ID (before/after values, user, timestamp). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "audit_entry_id": { "type": "integer", "description": "The audit entry ID" } },
+                "required": ["audit_entry_id"]
+            }
+        }),
+        json!({
+            "name": "get_field",
+            "description": "Get a single custom field definition by ID (name, data type, validation rules, dropdown options). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "field_id": { "type": "integer", "description": "The field ID" } },
+                "required": ["field_id"]
+            }
+        }),
+        json!({
+            "name": "get_pax8_data",
+            "description": "Retrieve Pax8 distributor data (subscriptions, products, companies) from a connected Pax8 integration. Endpoint guessed AND depends on integration authorization — check list_integration_configs first.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "datatype": { "type": "string", "description": "Data category, e.g. subscriptions, products, companies (optional)" },
+                    "search": { "type": "string", "description": "Free-text search (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "get_meraki_data",
+            "description": "Retrieve Meraki network data from a connected Meraki integration. Endpoint guessed AND depends on integration authorization — check list_integration_configs first.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "import_from_xero",
+            "description": "Trigger a data import sync from the connected Xero integration. WARNING: irreversibly syncs external data. Endpoint guessed — unconfirmed against this sandbox, never live-tested.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "options": { "type": "object", "description": "Import options, if any" } }
+            }
+        }),
+        json!({
+            "name": "list_approval_processes",
+            "description": "List approval processes (multi-step approval workflows for changes, purchases, etc). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "get_approval_process",
+            "description": "Get full details of a single approval process by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "process_id": { "type": "integer", "description": "The approval process ID" } },
+                "required": ["process_id"]
+            }
+        }),
+        json!({
+            "name": "create_approval_process",
+            "description": "Create a new approval process. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"name\": \"Change Approval\", \"type\": 1 }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "list_approval_rules",
+            "description": "List approval rules that define when approvals are triggered. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "process_id": { "type": "integer", "description": "Filter by approval process ID (optional)" } }
+            }
+        }),
+        json!({
+            "name": "create_approval_rule",
+            "description": "Create a new approval rule. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"process_id\": 1, \"name\": \"High Priority Changes\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "list_views",
+            "description": "List saved views (pre-configured filter/column layouts) for a domain, e.g. tickets or opportunities. Confirmed against the agent UI's own request.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "domain": { "type": "string", "description": "Entity domain, e.g. 'reqs' (tickets), 'opps' (opportunities)" },
+                    "view_type": { "type": "string", "description": "View type, usually matches domain" }
+                },
+                "required": ["domain", "view_type"]
+            }
+        }),
+        json!({
+            "name": "get_view",
+            "description": "Get full details of a single saved view by ID. Endpoint guessed — unconfirmed against this sandbox (list_views itself is confirmed).",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "view_id": { "type": "integer", "description": "The view ID" } },
+                "required": ["view_id"]
+            }
+        }),
+        json!({
+            "name": "list_view_filters",
+            "description": "List available filter definitions for a view domain. Confirmed against the agent UI's own request.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "view_type": { "type": "string", "description": "View type, e.g. 'reqs' (tickets), 'opps' (opportunities)" },
+                    "ticketarea_id": { "type": "integer", "description": "Filter by ticket area ID (optional)" }
+                },
+                "required": ["view_type"]
+            }
+        }),
+        json!({
+            "name": "list_view_columns",
+            "description": "List available column definitions for a view domain. Endpoint guessed — unconfirmed against this sandbox (list_view_filters itself is confirmed).",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "domain": { "type": "string", "description": "Entity domain, e.g. 'tickets', 'assets' (optional)" } }
+            }
+        }),
+        json!({
             "name": "create_client",
             "description": "Create a new client (customer organization). Reuses the same confirmed /api/Client base path as get_client/list_clients.",
             "inputSchema": {
@@ -1951,6 +2180,31 @@ pub async fn execute_tool(
         "get_status_details" => exec_get_status_details(args, client).await,
         "global_search" => exec_global_search(args, client).await,
         "list_field_groups" => exec_list_field_groups(client).await,
+        "list_asset_changes" => exec_list_asset_changes(args, client).await,
+        "list_device_licences" => exec_list_device_licences(args, client).await,
+        "create_invoice" => exec_create_invoice(args, client).await,
+        "void_invoice" => exec_void_invoice(args, client).await,
+        "list_suppliers" => exec_list_suppliers(args, client).await,
+        "get_supplier" => exec_get_supplier(args, client).await,
+        "create_supplier" => exec_create_supplier(args, client).await,
+        "create_supplier_user" => exec_create_supplier_user(args, client).await,
+        "list_sales_orders" => exec_list_sales_orders(args, client).await,
+        "get_sales_order" => exec_get_sales_order(args, client).await,
+        "create_sales_order" => exec_create_sales_order(args, client).await,
+        "get_audit_entry" => exec_get_audit_entry(args, client).await,
+        "get_field" => exec_get_field(args, client).await,
+        "get_pax8_data" => exec_get_pax8_data(args, client).await,
+        "get_meraki_data" => exec_get_meraki_data(client).await,
+        "import_from_xero" => exec_import_from_xero(args, client).await,
+        "list_approval_processes" => exec_list_approval_processes(client).await,
+        "get_approval_process" => exec_get_approval_process(args, client).await,
+        "create_approval_process" => exec_create_approval_process(args, client).await,
+        "list_approval_rules" => exec_list_approval_rules(args, client).await,
+        "create_approval_rule" => exec_create_approval_rule(args, client).await,
+        "list_views" => exec_list_views(args, client).await,
+        "get_view" => exec_get_view(args, client).await,
+        "list_view_filters" => exec_list_view_filters(args, client).await,
+        "list_view_columns" => exec_list_view_columns(args, client).await,
         "create_client" => exec_create_client(args, client).await,
         "list_invoice_payments" => exec_list_invoice_payments(args, client).await,
         "list_workflows" => exec_list_workflows(args, client).await,
@@ -2567,6 +2821,162 @@ async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<Stri
 async fn exec_list_field_groups(client: &HaloPSAClient) -> Result<String, String> {
     let groups = client.list_field_groups().await?;
     Ok(serde_json::to_string_pretty(&json!({ "field_groups": groups })).unwrap())
+}
+
+async fn exec_list_asset_changes(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let asset_id = args.get("asset_id").and_then(|v| v.as_i64());
+    let count = args.get("count").and_then(|v| v.as_i64()).unwrap_or(200);
+    let changes = client.list_asset_changes(asset_id, count).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "changes": changes })).unwrap())
+}
+
+async fn exec_list_device_licences(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let device_id = args.get("device_id").and_then(|v| v.as_i64());
+    let licences = client.list_device_licences(device_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "licences": licences })).unwrap())
+}
+
+async fn exec_create_invoice(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_invoice(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_void_invoice(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let invoice_id = args.get("invoice_id").and_then(|v| v.as_i64()).ok_or("invoice_id is required")?;
+    let result = client.void_invoice(invoice_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_suppliers(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let count = args.get("count").and_then(|v| v.as_i64()).unwrap_or(50);
+    let suppliers = client.list_suppliers(count).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "suppliers": suppliers })).unwrap())
+}
+
+async fn exec_get_supplier(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let supplier_id = args.get("supplier_id").and_then(|v| v.as_i64()).ok_or("supplier_id is required")?;
+    let result = client.get_supplier(supplier_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_supplier(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_supplier(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_supplier_user(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let supplier_id = args.get("supplier_id").and_then(|v| v.as_i64()).ok_or("supplier_id is required")?;
+    let supplier_name = args.get("supplier_name").and_then(|v| v.as_str()).ok_or("supplier_name is required")?;
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_supplier_user(supplier_id, supplier_name, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_sales_orders(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let client_id = args.get("client_id").and_then(|v| v.as_i64());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let orders = client.list_sales_orders(client_id, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "sales_orders": orders })).unwrap())
+}
+
+async fn exec_get_sales_order(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let sales_order_id = args.get("sales_order_id").and_then(|v| v.as_i64()).ok_or("sales_order_id is required")?;
+    let result = client.get_sales_order(sales_order_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_sales_order(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_sales_order(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_audit_entry(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let audit_entry_id = args.get("audit_entry_id").and_then(|v| v.as_i64()).ok_or("audit_entry_id is required")?;
+    let result = client.get_audit_entry(audit_entry_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_field(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let field_id = args.get("field_id").and_then(|v| v.as_i64()).ok_or("field_id is required")?;
+    let result = client.get_field(field_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_pax8_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let search = args.get("search").and_then(|v| v.as_str());
+    let result = client.get_pax8_data(datatype, search).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_meraki_data(client: &HaloPSAClient) -> Result<String, String> {
+    let result = client.get_meraki_data().await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_import_from_xero(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let options = args.get("options").cloned().unwrap_or(json!({}));
+    let result = client.import_from_xero(options).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_approval_processes(client: &HaloPSAClient) -> Result<String, String> {
+    let processes = client.list_approval_processes().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "approval_processes": processes })).unwrap())
+}
+
+async fn exec_get_approval_process(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let process_id = args.get("process_id").and_then(|v| v.as_i64()).ok_or("process_id is required")?;
+    let result = client.get_approval_process(process_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_approval_process(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_approval_process(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_approval_rules(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let process_id = args.get("process_id").and_then(|v| v.as_i64());
+    let rules = client.list_approval_rules(process_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "approval_rules": rules })).unwrap())
+}
+
+async fn exec_create_approval_rule(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_approval_rule(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_views(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let domain = args.get("domain").and_then(|v| v.as_str()).ok_or("domain is required")?;
+    let view_type = args.get("view_type").and_then(|v| v.as_str()).ok_or("view_type is required")?;
+    let views = client.list_views(domain, view_type).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "views": views })).unwrap())
+}
+
+async fn exec_get_view(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let view_id = args.get("view_id").and_then(|v| v.as_i64()).ok_or("view_id is required")?;
+    let result = client.get_view(view_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_view_filters(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let view_type = args.get("view_type").and_then(|v| v.as_str()).ok_or("view_type is required")?;
+    let ticketarea_id = args.get("ticketarea_id").and_then(|v| v.as_i64());
+    let filters = client.list_view_filters(view_type, ticketarea_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "filters": filters })).unwrap())
+}
+
+async fn exec_list_view_columns(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let domain = args.get("domain").and_then(|v| v.as_str());
+    let columns = client.list_view_columns(domain).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "columns": columns })).unwrap())
 }
 
 async fn exec_create_client(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

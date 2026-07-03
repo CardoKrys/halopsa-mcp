@@ -863,6 +863,202 @@ impl HaloPSAClient {
         self.get_raw(&format!("/api/Report/{report_id}"), &params).await
     }
 
+    // --- Assets (audit trail / licence assignment). Endpoints guessed;
+    // list_device_licences reuses the same base path as the confirmed
+    // list_software_licences with a different filter ---
+
+    pub async fn list_asset_changes(&self, asset_id: Option<i64>, count: i64) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![("count", count.max(1).min(200).to_string())];
+        if let Some(id) = asset_id {
+            params.push(("asset_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/AssetChange", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn list_device_licences(&self, device_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![("pageinate", "true".into()), ("page_size", "100".into())];
+        if let Some(id) = device_id {
+            params.push(("asset_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Licence", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    // --- Invoices (create/void). create_invoice reuses the confirmed
+    // /api/Invoice base path; void_invoice's field name is guessed ---
+
+    pub async fn create_invoice(&self, invoice: Value) -> Result<Value, String> {
+        self.post("/api/Invoice", &json!([invoice])).await
+    }
+
+    pub async fn void_invoice(&self, invoice_id: i64) -> Result<Value, String> {
+        self.post("/api/Invoice", &json!([{ "id": invoice_id, "voidinvoice": true }])).await
+    }
+
+    // --- Suppliers (endpoints guessed from HaloPSA's naming convention.
+    // create_supplier_user's payload shape is informed by a third-party
+    // connector's own documented behavior: POST to /api/Users with
+    // isuserdetails=true and an embedded supplier object, since suppliers
+    // are Users under the hood, same as clients) ---
+
+    pub async fn list_suppliers(&self, count: i64) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw("/api/Supplier", &[("count", count.max(1).min(200).to_string())])
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_supplier(&self, supplier_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Supplier/{supplier_id}"), &[("includedetails", "true".into())])
+            .await
+    }
+
+    pub async fn create_supplier(&self, supplier: Value) -> Result<Value, String> {
+        self.post("/api/Supplier", &json!([supplier])).await
+    }
+
+    pub async fn create_supplier_user(&self, supplier_id: i64, supplier_name: &str, mut fields: Value) -> Result<Value, String> {
+        if let Some(obj) = fields.as_object_mut() {
+            obj.insert("isuserdetails".into(), json!(true));
+            obj.insert("supplier".into(), json!({ "id": supplier_id, "lookupdisplay": supplier_name }));
+        }
+        self.post("/api/Users", &json!([fields])).await
+    }
+
+    // --- Sales Orders (endpoints guessed from HaloPSA's naming
+    // convention; NOT confirmed against a real capture) ---
+
+    pub async fn list_sales_orders(&self, client_id: Option<i64>, page: i64, page_size: i64) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(id) = client_id {
+            params.push(("client_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/SalesOrder", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_sales_order(&self, sales_order_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/SalesOrder/{sales_order_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    pub async fn create_sales_order(&self, sales_order: Value) -> Result<Value, String> {
+        self.post("/api/SalesOrder", &json!([sales_order])).await
+    }
+
+    // --- Audit (endpoints guessed from HaloPSA's naming convention) ---
+
+    pub async fn get_audit_entry(&self, audit_entry_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/AuditEntry/{audit_entry_id}"), &[]).await
+    }
+
+    pub async fn get_field(&self, field_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Field/{field_id}"), &[]).await
+    }
+
+    // --- Integration Data (remaining passthroughs) / Integration Sync ---
+
+    pub async fn get_pax8_data(&self, datatype: Option<&str>, search: Option<&str>) -> Result<Value, String> {
+        self.get_integration_data("Pax8", datatype, search).await
+    }
+
+    pub async fn get_meraki_data(&self) -> Result<Value, String> {
+        self.get_integration_data("Meraki", None, None).await
+    }
+
+    /// Trigger a data import sync against the connected Xero integration.
+    /// Endpoint guessed — irreversibly syncs external data, never invoked
+    /// here.
+    pub async fn import_from_xero(&self, options: Value) -> Result<Value, String> {
+        self.post("/api/Xero/Import", &options).await
+    }
+
+    // --- Approval Processes (endpoints guessed from HaloPSA's naming
+    // convention; NOT confirmed against a real capture) ---
+
+    pub async fn list_approval_processes(&self) -> Result<Vec<Value>, String> {
+        let value = self.get_no_params("/api/ApprovalProcess").await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_approval_process(&self, process_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/ApprovalProcess/{process_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    pub async fn create_approval_process(&self, process: Value) -> Result<Value, String> {
+        self.post("/api/ApprovalProcess", &json!([process])).await
+    }
+
+    pub async fn list_approval_rules(&self, process_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = process_id {
+            params.push(("process_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/ApprovalRule", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn create_approval_rule(&self, rule: Value) -> Result<Value, String> {
+        self.post("/api/ApprovalRule", &json!([rule])).await
+    }
+
+    // --- Saved Views. list_views and list_view_filters reuse endpoints
+    // confirmed via the agent UI's own requests during the Projects/
+    // Opportunities investigation (/api/viewlists, /api/ViewFilter) ---
+
+    pub async fn list_views(&self, domain: &str, view_type: &str) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw(
+                "/api/viewlists",
+                &[
+                    ("showcounts", "true".into()),
+                    ("domain", domain.into()),
+                    ("type", view_type.into()),
+                ],
+            )
+            .await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// Get a single saved view by ID. Endpoint guessed — NOT confirmed
+    /// against a real capture (list_views itself is confirmed).
+    pub async fn get_view(&self, view_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/View/{view_id}"), &[]).await
+    }
+
+    pub async fn list_view_filters(&self, view_type: &str, ticketarea_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![("type", view_type.into())];
+        if let Some(id) = ticketarea_id {
+            params.push(("ticketarea_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/ViewFilter", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// List available columns for saved views. Endpoint guessed — NOT
+    /// confirmed against a real capture (list_view_filters itself is
+    /// confirmed).
+    pub async fn list_view_columns(&self, domain: Option<&str>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(d) = domain {
+            params.push(("domain", d.to_string()));
+        }
+        let value = self.get_raw("/api/ViewColumn", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
     /// Create a new client. Reuses the same confirmed /api/Client base
     /// path as get_client/list_clients.
     pub async fn create_client(&self, client_data: Value) -> Result<Value, String> {
@@ -1172,7 +1368,12 @@ impl HaloPSAClient {
         if let Some(s) = search {
             params.push(("search", s.to_string()));
         }
-        self.get_raw(&format!("/api/{system}"), &params).await
+        // A third-party HaloPSA connector's own tool descriptions for
+        // SentinelOne/Sophos noted the legacy path is
+        // /api/IntegrationData/Get/{System} — some integrations may have
+        // moved off this pattern since, so this is a better-informed guess
+        // than a flat /api/{System}, not a confirmed capture.
+        self.get_raw(&format!("/api/IntegrationData/Get/{system}"), &params).await
     }
 
     pub async fn get_microsoft_csp_data(&self, datatype: Option<&str>, search: Option<&str>) -> Result<Value, String> {
