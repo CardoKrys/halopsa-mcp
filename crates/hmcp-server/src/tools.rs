@@ -423,6 +423,422 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
+            "name": "list_workflows",
+            "description": "List workflows (multi-step processes for ticket handling). Uses the same base path as the already-confirmed get_available_actions/list_workflow_steps.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_workflow",
+            "description": "Get full details of a single workflow by ID. Uses the same confirmed endpoint as list_workflow_steps.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "workflow_id": { "type": "integer", "description": "The workflow ID" } },
+                "required": ["workflow_id"]
+            }
+        }),
+        json!({
+            "name": "create_workflow",
+            "description": "Create a new workflow. Endpoint unconfirmed against this sandbox for writes — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Workflow fields, e.g. { \"name\": \"New Employee Onboarding\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "update_workflow",
+            "description": "Update an existing workflow's fields. Endpoint unconfirmed against this sandbox for writes — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "workflow_id": { "type": "integer", "description": "The workflow ID" },
+                    "fields": { "type": "object", "description": "Fields to update" }
+                },
+                "required": ["workflow_id", "fields"]
+            }
+        }),
+        json!({
+            "name": "delete_workflow",
+            "description": "Delete a workflow by ID. WARNING: permanently removes it; active tickets using it may be affected. Endpoint unconfirmed against this sandbox.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "workflow_id": { "type": "integer", "description": "The workflow ID" } },
+                "required": ["workflow_id"]
+            }
+        }),
+        json!({
+            "name": "list_notifications",
+            "description": "List notification rule definitions. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "agent_id": { "type": "integer", "description": "Filter by agent ID (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_notification",
+            "description": "Get a single notification rule by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "notification_id": { "type": "integer", "description": "The notification ID" } },
+                "required": ["notification_id"]
+            }
+        }),
+        json!({
+            "name": "create_notification",
+            "description": "Create a new notification rule. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Notification fields, e.g. { \"subject\": \"VIP escalation\", \"agent_id\": 12 }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "send_notification_message",
+            "description": "Send a direct notification message to an agent. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"message\": \"Please review ticket #5678\", \"agent_id\": 12 }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "list_services",
+            "description": "List services in the service catalogue. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "search": { "type": "string", "description": "Free-text search (optional)" },
+                    "category_id": { "type": "integer", "description": "Filter by service category ID (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_service",
+            "description": "Get full details of a single service by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "service_id": { "type": "integer", "description": "The service ID" } },
+                "required": ["service_id"]
+            }
+        }),
+        json!({
+            "name": "list_service_categories",
+            "description": "List service catalogue categories. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "list_service_statuses",
+            "description": "List service status history, optionally for a specific service. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "service_id": { "type": "integer", "description": "Filter by service ID (optional)" } }
+            }
+        }),
+        json!({
+            "name": "create_service_status",
+            "description": "Record a new service status entry (operational, degraded, outage). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"service_id\": 1, \"status\": \"degraded\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "list_invoice_statuses",
+            "description": "List invoice statuses (e.g. Draft, Approved, Posted, Paid). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "get_invoice_status",
+            "description": "Get a single invoice status by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "status_id": { "type": "integer", "description": "The invoice status ID" } },
+                "required": ["status_id"]
+            }
+        }),
+        json!({
+            "name": "create_invoice_status",
+            "description": "Create a new invoice status. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"name\": \"Awaiting Payment\" }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "delete_invoice_status",
+            "description": "Delete an invoice status by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "status_id": { "type": "integer", "description": "The invoice status ID" } },
+                "required": ["status_id"]
+            }
+        }),
+        json!({
+            "name": "update_invoice_lines",
+            "description": "Bulk-update invoice line items. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "lines": { "type": "array", "description": "Line objects, each including its id and the fields to change", "items": { "type": "object" } } },
+                "required": ["lines"]
+            }
+        }),
+        json!({
+            "name": "update_sales_order_lines",
+            "description": "Bulk-update sales order line items. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "lines": { "type": "array", "description": "Line objects, each including its id and the fields to change", "items": { "type": "object" } } },
+                "required": ["lines"]
+            }
+        }),
+        json!({
+            "name": "register_invoice_view",
+            "description": "Record that a user has viewed an invoice. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "invoice_id": { "type": "integer", "description": "The invoice ID" } },
+                "required": ["invoice_id"]
+            }
+        }),
+        json!({
+            "name": "register_sales_order_view",
+            "description": "Record that a user has viewed a sales order. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "sales_order_id": { "type": "integer", "description": "The sales order ID" } },
+                "required": ["sales_order_id"]
+            }
+        }),
+        json!({
+            "name": "register_purchase_order_view",
+            "description": "Record that a user has viewed a purchase order. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "purchase_order_id": { "type": "integer", "description": "The purchase order ID" } },
+                "required": ["purchase_order_id"]
+            }
+        }),
+        json!({
+            "name": "register_kb_article_view",
+            "description": "Record that a user has viewed a knowledge base article. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "kb_article_id": { "type": "integer", "description": "The KB article ID" } },
+                "required": ["kb_article_id"]
+            }
+        }),
+        json!({
+            "name": "review_expense",
+            "description": "Mark one or more expenses as reviewed. Financial approval action. Endpoint and body shape guessed — unconfirmed against this sandbox, never live-tested.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "expense_ids": { "type": "array", "items": { "type": "integer" }, "description": "Expense IDs to mark reviewed" } },
+                "required": ["expense_ids"]
+            }
+        }),
+        json!({
+            "name": "expire_client_prepay",
+            "description": "Expire one or more client prepay balances. WARNING: voids remaining prepaid credit. Endpoint and body shape guessed — unconfirmed against this sandbox, never live-tested.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "prepay_ids": { "type": "array", "items": { "type": "integer" }, "description": "Prepay record IDs to expire" } },
+                "required": ["prepay_ids"]
+            }
+        }),
+        json!({
+            "name": "list_integration_configs",
+            "description": "List all configured third-party integrations with their connection status. Endpoint path unconfirmed against this sandbox (real field shape confirmed via StackJack reference).",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "get_integration_config",
+            "description": "Get full details of a single integration config by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "config_id": { "type": "integer", "description": "The integration config ID" } },
+                "required": ["config_id"]
+            }
+        }),
+        json!({
+            "name": "list_integration_site_mappings",
+            "description": "List site mappings between Halo and a connected third-party integration. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "module_id": { "type": "integer", "description": "Filter by integration module ID (optional)" } }
+            }
+        }),
+        json!({
+            "name": "list_integration_errors",
+            "description": "List integration sync errors, for troubleshooting failed third-party syncs. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "module_id": { "type": "integer", "description": "Filter by integration module ID (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-200, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_integration_error",
+            "description": "Get full details of a single integration error by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "error_id": { "type": "integer", "description": "The integration error ID" } },
+                "required": ["error_id"]
+            }
+        }),
+        json!({
+            "name": "list_integration_requests",
+            "description": "List integration API request/response logs. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "module_id": { "type": "integer", "description": "Filter by integration module ID (optional)" },
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-200, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_integration_request",
+            "description": "Get full details of a single integration request log entry by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "request_id": { "type": "integer", "description": "The integration request ID" } },
+                "required": ["request_id"]
+            }
+        }),
+        json!({
+            "name": "list_integration_field_mappings",
+            "description": "List field mappings between Halo and a connected third-party integration. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "module_id": { "type": "integer", "description": "Filter by integration module ID (optional)" } }
+            }
+        }),
+        json!({
+            "name": "get_microsoft_csp_data",
+            "description": "Retrieve Microsoft CSP data (subscriptions, licences, tenants) from a connected Microsoft Partner Center integration. Highest-uncertainty tool in this batch — endpoint guessed AND depends on whether this integration is actually authorized on the target tenant (check list_integration_configs first).",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "datatype": { "type": "string", "description": "Data category, e.g. subscriptions, licences, customers (optional)" },
+                    "search": { "type": "string", "description": "Free-text search (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "get_intune_data",
+            "description": "Retrieve Microsoft Intune data (devices, compliance policies, apps) from a connected Intune integration. Endpoint guessed AND depends on integration authorization — check list_integration_configs first.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "datatype": { "type": "string", "description": "Data category, e.g. devices, compliancepolicies, apps (optional)" },
+                    "search": { "type": "string", "description": "Free-text search (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "get_azure_ad_data",
+            "description": "Retrieve Azure AD/Entra ID data (users, groups, licences) from a connected Azure AD integration. Endpoint guessed AND depends on integration authorization — check list_integration_configs first.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "datatype": { "type": "string", "description": "Data category, e.g. users, groups, licenses (optional)" },
+                    "search": { "type": "string", "description": "Free-text search (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "get_ninja_rmm_data",
+            "description": "Retrieve NinjaRMM data from a connected NinjaRMM integration. list_integration_configs shows this integration IS currently authorized on production, unlike most other Integration Data tools in this batch.",
+            "inputSchema": { "type": "object", "properties": {} }
+        }),
+        json!({
+            "name": "get_xero_data",
+            "description": "Retrieve Xero accounting data (invoices, contacts, payments) from a connected Xero integration. Endpoint guessed AND depends on integration authorization — check list_integration_configs first.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "datatype": { "type": "string", "description": "Data category, e.g. invoices, contacts, payments (optional)" },
+                    "search": { "type": "string", "description": "Free-text search (optional)" }
+                }
+            }
+        }),
+        json!({
+            "name": "list_xero_details",
+            "description": "List Xero sync detail records. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
+                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                }
+            }
+        }),
+        json!({
+            "name": "get_xero_detail",
+            "description": "Get a single Xero sync detail record by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "detail_id": { "type": "integer", "description": "The Xero detail record ID" } },
+                "required": ["detail_id"]
+            }
+        }),
+        json!({
+            "name": "send_invoice_to_xero",
+            "description": "Push an invoice to the connected Xero accounting integration. Endpoint guessed — unconfirmed against this sandbox, never live-tested.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "invoice_id": { "type": "integer", "description": "The invoice ID to send" } },
+                "required": ["invoice_id"]
+            }
+        }),
+        json!({
+            "name": "create_asset",
+            "description": "Create a new asset. Reuses the same confirmed /api/Asset base path as get_asset/list_assets.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "fields": { "type": "object", "description": "Asset fields, e.g. { \"inventory_number\": \"PC-001\", \"client_id\": 42, \"assettype_id\": 1 }" } },
+                "required": ["fields"]
+            }
+        }),
+        json!({
+            "name": "update_asset",
+            "description": "Update an existing asset's fields. Reuses the same confirmed /api/Asset base path as get_asset/list_assets.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "asset_id": { "type": "integer", "description": "The asset ID" },
+                    "fields": { "type": "object", "description": "Fields to update" }
+                },
+                "required": ["asset_id", "fields"]
+            }
+        }),
+        json!({
+            "name": "list_asset_software",
+            "description": "List software discovered on assets, optionally filtered by device. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "inputSchema": {
+                "type": "object",
+                "properties": { "asset_id": { "type": "integer", "description": "Filter by asset/device ID (optional)" } }
+            }
+        }),
+        json!({
             "name": "list_roles",
             "description": "List access-control roles. Endpoint unconfirmed against this sandbox — flag results as unverified.",
             "inputSchema": {
@@ -1515,6 +1931,51 @@ pub async fn execute_tool(
         "get_status_details" => exec_get_status_details(args, client).await,
         "global_search" => exec_global_search(args, client).await,
         "list_field_groups" => exec_list_field_groups(client).await,
+        "list_workflows" => exec_list_workflows(args, client).await,
+        "get_workflow" => exec_get_workflow(args, client).await,
+        "create_workflow" => exec_create_workflow(args, client).await,
+        "update_workflow" => exec_update_workflow(args, client).await,
+        "delete_workflow" => exec_delete_workflow(args, client).await,
+        "list_notifications" => exec_list_notifications(args, client).await,
+        "get_notification" => exec_get_notification(args, client).await,
+        "create_notification" => exec_create_notification(args, client).await,
+        "send_notification_message" => exec_send_notification_message(args, client).await,
+        "list_services" => exec_list_services(args, client).await,
+        "get_service" => exec_get_service(args, client).await,
+        "list_service_categories" => exec_list_service_categories(client).await,
+        "list_service_statuses" => exec_list_service_statuses(args, client).await,
+        "create_service_status" => exec_create_service_status(args, client).await,
+        "list_invoice_statuses" => exec_list_invoice_statuses(client).await,
+        "get_invoice_status" => exec_get_invoice_status(args, client).await,
+        "create_invoice_status" => exec_create_invoice_status(args, client).await,
+        "delete_invoice_status" => exec_delete_invoice_status(args, client).await,
+        "update_invoice_lines" => exec_update_invoice_lines(args, client).await,
+        "update_sales_order_lines" => exec_update_sales_order_lines(args, client).await,
+        "register_invoice_view" => exec_register_invoice_view(args, client).await,
+        "register_sales_order_view" => exec_register_sales_order_view(args, client).await,
+        "register_purchase_order_view" => exec_register_purchase_order_view(args, client).await,
+        "register_kb_article_view" => exec_register_kb_article_view(args, client).await,
+        "review_expense" => exec_review_expense(args, client).await,
+        "expire_client_prepay" => exec_expire_client_prepay(args, client).await,
+        "list_integration_configs" => exec_list_integration_configs(client).await,
+        "get_integration_config" => exec_get_integration_config(args, client).await,
+        "list_integration_site_mappings" => exec_list_integration_site_mappings(args, client).await,
+        "list_integration_errors" => exec_list_integration_errors(args, client).await,
+        "get_integration_error" => exec_get_integration_error(args, client).await,
+        "list_integration_requests" => exec_list_integration_requests(args, client).await,
+        "get_integration_request" => exec_get_integration_request(args, client).await,
+        "list_integration_field_mappings" => exec_list_integration_field_mappings(args, client).await,
+        "get_microsoft_csp_data" => exec_get_microsoft_csp_data(args, client).await,
+        "get_intune_data" => exec_get_intune_data(args, client).await,
+        "get_azure_ad_data" => exec_get_azure_ad_data(args, client).await,
+        "get_ninja_rmm_data" => exec_get_ninja_rmm_data(client).await,
+        "get_xero_data" => exec_get_xero_data(args, client).await,
+        "list_xero_details" => exec_list_xero_details(args, client).await,
+        "get_xero_detail" => exec_get_xero_detail(args, client).await,
+        "send_invoice_to_xero" => exec_send_invoice_to_xero(args, client).await,
+        "create_asset" => exec_create_asset(args, client).await,
+        "update_asset" => exec_update_asset(args, client).await,
+        "list_asset_software" => exec_list_asset_software(args, client).await,
         "list_roles" => exec_list_roles(args, client).await,
         "get_role" => exec_get_role(args, client).await,
         "create_role" => exec_create_role(args, client).await,
@@ -2084,6 +2545,301 @@ async fn exec_global_search(args: &Value, client: &HaloPSAClient) -> Result<Stri
 async fn exec_list_field_groups(client: &HaloPSAClient) -> Result<String, String> {
     let groups = client.list_field_groups().await?;
     Ok(serde_json::to_string_pretty(&json!({ "field_groups": groups })).unwrap())
+}
+
+async fn exec_list_workflows(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let workflows = client.list_workflows(page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "workflows": workflows })).unwrap())
+}
+
+async fn exec_get_workflow(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let workflow_id = args.get("workflow_id").and_then(|v| v.as_i64()).ok_or("workflow_id is required")?;
+    let result = client.get_workflow_details(workflow_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_workflow(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_workflow(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_workflow(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let workflow_id = args.get("workflow_id").and_then(|v| v.as_i64()).ok_or("workflow_id is required")?;
+    let fields = args.get("fields").cloned().unwrap_or(json!({}));
+    let result = client.update_workflow(workflow_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_workflow(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let workflow_id = args.get("workflow_id").and_then(|v| v.as_i64()).ok_or("workflow_id is required")?;
+    client.delete_workflow(workflow_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "workflow_id": workflow_id })).unwrap())
+}
+
+async fn exec_list_notifications(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let agent_id = args.get("agent_id").and_then(|v| v.as_i64());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let notifications = client.list_notifications(agent_id, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "notifications": notifications })).unwrap())
+}
+
+async fn exec_get_notification(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let notification_id = args.get("notification_id").and_then(|v| v.as_i64()).ok_or("notification_id is required")?;
+    let result = client.get_notification(notification_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_notification(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_notification(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_send_notification_message(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.send_notification_message(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_services(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let search = args.get("search").and_then(|v| v.as_str());
+    let category_id = args.get("category_id").and_then(|v| v.as_i64());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let (services, total) = client.list_services(search, category_id, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "services": services, "total_count": total, "page": page, "page_size": page_size })).unwrap())
+}
+
+async fn exec_get_service(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let service_id = args.get("service_id").and_then(|v| v.as_i64()).ok_or("service_id is required")?;
+    let result = client.get_service(service_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_service_categories(client: &HaloPSAClient) -> Result<String, String> {
+    let categories = client.list_service_categories().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "service_categories": categories })).unwrap())
+}
+
+async fn exec_list_service_statuses(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let service_id = args.get("service_id").and_then(|v| v.as_i64());
+    let statuses = client.list_service_statuses(service_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "statuses": statuses })).unwrap())
+}
+
+async fn exec_create_service_status(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_service_status(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_invoice_statuses(client: &HaloPSAClient) -> Result<String, String> {
+    let statuses = client.list_invoice_statuses().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "invoice_statuses": statuses })).unwrap())
+}
+
+async fn exec_get_invoice_status(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let status_id = args.get("status_id").and_then(|v| v.as_i64()).ok_or("status_id is required")?;
+    let result = client.get_invoice_status(status_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_invoice_status(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_invoice_status(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_delete_invoice_status(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let status_id = args.get("status_id").and_then(|v| v.as_i64()).ok_or("status_id is required")?;
+    client.delete_invoice_status(status_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "status_id": status_id })).unwrap())
+}
+
+async fn exec_update_invoice_lines(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let lines = args.get("lines").cloned().ok_or("lines is required")?;
+    let result = client.update_invoice_lines(lines).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_sales_order_lines(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let lines = args.get("lines").cloned().ok_or("lines is required")?;
+    let result = client.update_sales_order_lines(lines).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_register_invoice_view(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let invoice_id = args.get("invoice_id").and_then(|v| v.as_i64()).ok_or("invoice_id is required")?;
+    let result = client.register_invoice_view(invoice_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_register_sales_order_view(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let sales_order_id = args.get("sales_order_id").and_then(|v| v.as_i64()).ok_or("sales_order_id is required")?;
+    let result = client.register_sales_order_view(sales_order_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_register_purchase_order_view(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let purchase_order_id = args.get("purchase_order_id").and_then(|v| v.as_i64()).ok_or("purchase_order_id is required")?;
+    let result = client.register_purchase_order_view(purchase_order_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_register_kb_article_view(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let kb_article_id = args.get("kb_article_id").and_then(|v| v.as_i64()).ok_or("kb_article_id is required")?;
+    let result = client.register_kb_article_view(kb_article_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_review_expense(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let expense_ids: Vec<i64> = args
+        .get("expense_ids")
+        .and_then(|v| v.as_array())
+        .ok_or("expense_ids is required")?
+        .iter()
+        .filter_map(|v| v.as_i64())
+        .collect();
+    let result = client.review_expense(&expense_ids).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_expire_client_prepay(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let prepay_ids: Vec<i64> = args
+        .get("prepay_ids")
+        .and_then(|v| v.as_array())
+        .ok_or("prepay_ids is required")?
+        .iter()
+        .filter_map(|v| v.as_i64())
+        .collect();
+    let result = client.expire_client_prepay(&prepay_ids).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_integration_configs(client: &HaloPSAClient) -> Result<String, String> {
+    let configs = client.list_integration_configs().await?;
+    Ok(serde_json::to_string_pretty(&json!({ "integration_configs": configs })).unwrap())
+}
+
+async fn exec_get_integration_config(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let config_id = args.get("config_id").and_then(|v| v.as_i64()).ok_or("config_id is required")?;
+    let result = client.get_integration_config(config_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_integration_site_mappings(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let module_id = args.get("module_id").and_then(|v| v.as_i64());
+    let mappings = client.list_integration_site_mappings(module_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "site_mappings": mappings })).unwrap())
+}
+
+async fn exec_list_integration_errors(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let module_id = args.get("module_id").and_then(|v| v.as_i64());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let errors = client.list_integration_errors(module_id, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "errors": errors })).unwrap())
+}
+
+async fn exec_get_integration_error(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let error_id = args.get("error_id").and_then(|v| v.as_i64()).ok_or("error_id is required")?;
+    let result = client.get_integration_error(error_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_integration_requests(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let module_id = args.get("module_id").and_then(|v| v.as_i64());
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let requests = client.list_integration_requests(module_id, page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "requests": requests })).unwrap())
+}
+
+async fn exec_get_integration_request(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let request_id = args.get("request_id").and_then(|v| v.as_i64()).ok_or("request_id is required")?;
+    let result = client.get_integration_request(request_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_integration_field_mappings(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let module_id = args.get("module_id").and_then(|v| v.as_i64());
+    let mappings = client.list_integration_field_mappings(module_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "field_mappings": mappings })).unwrap())
+}
+
+async fn exec_get_microsoft_csp_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let search = args.get("search").and_then(|v| v.as_str());
+    let result = client.get_microsoft_csp_data(datatype, search).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_intune_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let search = args.get("search").and_then(|v| v.as_str());
+    let result = client.get_intune_data(datatype, search).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_azure_ad_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let search = args.get("search").and_then(|v| v.as_str());
+    let result = client.get_azure_ad_data(datatype, search).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_ninja_rmm_data(client: &HaloPSAClient) -> Result<String, String> {
+    let result = client.get_ninja_rmm_data().await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_get_xero_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let search = args.get("search").and_then(|v| v.as_str());
+    let result = client.get_xero_data(datatype, search).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_xero_details(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let details = client.list_xero_details(page, page_size).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "xero_details": details })).unwrap())
+}
+
+async fn exec_get_xero_detail(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let detail_id = args.get("detail_id").and_then(|v| v.as_i64()).ok_or("detail_id is required")?;
+    let result = client.get_xero_detail(detail_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_send_invoice_to_xero(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let invoice_id = args.get("invoice_id").and_then(|v| v.as_i64()).ok_or("invoice_id is required")?;
+    let result = client.send_invoice_to_xero(invoice_id).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_create_asset(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let fields = args.get("fields").cloned().ok_or("fields is required")?;
+    let result = client.create_asset(fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_update_asset(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let asset_id = args.get("asset_id").and_then(|v| v.as_i64()).ok_or("asset_id is required")?;
+    let fields = args.get("fields").cloned().unwrap_or(json!({}));
+    let result = client.update_asset(asset_id, fields).await?;
+    Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_asset_software(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let asset_id = args.get("asset_id").and_then(|v| v.as_i64());
+    let software = client.list_asset_software(asset_id).await?;
+    Ok(serde_json::to_string_pretty(&json!({ "software": software })).unwrap())
 }
 
 async fn exec_list_roles(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

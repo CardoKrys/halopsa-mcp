@@ -863,6 +863,368 @@ impl HaloPSAClient {
         self.get_raw(&format!("/api/Report/{report_id}"), &params).await
     }
 
+    // --- Workflows (list/get reuse the already-confirmed /api/Workflow
+    // base path used internally by the existing get_workflow/
+    // list_workflow_steps; write operations are unconfirmed) ---
+
+    pub async fn list_workflows(&self, page: i64, page_size: i64) -> Result<Vec<Value>, String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        let value = self.get_raw("/api/Workflow", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    /// Get full raw workflow details by ID. Same confirmed endpoint as the
+    /// existing get_workflow (used internally for steps), but returns the
+    /// full JSON rather than the narrower typed Workflow struct.
+    pub async fn get_workflow_details(&self, workflow_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Workflow/{workflow_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    pub async fn create_workflow(&self, workflow: Value) -> Result<Value, String> {
+        self.post("/api/Workflow", &json!([workflow])).await
+    }
+
+    pub async fn update_workflow(&self, workflow_id: i64, mut fields: Value) -> Result<Value, String> {
+        if let Some(obj) = fields.as_object_mut() {
+            obj.insert("id".into(), json!(workflow_id));
+        }
+        self.post("/api/Workflow", &json!([fields])).await
+    }
+
+    pub async fn delete_workflow(&self, workflow_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/Workflow/{workflow_id}"), &[]).await
+    }
+
+    // --- Notifications (endpoints guessed from HaloPSA's naming
+    // convention; NOT confirmed against a real capture) ---
+
+    pub async fn list_notifications(
+        &self,
+        agent_id: Option<i64>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(id) = agent_id {
+            params.push(("agent_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Notification", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_notification(&self, notification_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/Notification/{notification_id}"), &[]).await
+    }
+
+    pub async fn create_notification(&self, notification: Value) -> Result<Value, String> {
+        self.post("/api/Notification", &json!([notification])).await
+    }
+
+    pub async fn send_notification_message(&self, message: Value) -> Result<Value, String> {
+        self.post("/api/NotificationMessage", &json!([message])).await
+    }
+
+    // --- Service Catalog (endpoints guessed from HaloPSA's naming
+    // convention; NOT confirmed against a real capture) ---
+
+    pub async fn list_services(
+        &self,
+        search: Option<&str>,
+        category_id: Option<i64>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<(Vec<Value>, i64), String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        if let Some(s) = search {
+            params.push(("search", s.to_string()));
+        }
+        if let Some(id) = category_id {
+            params.push(("service_category_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Service", &params).await?;
+        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
+        let records = parse_halo_list::<Value>(value);
+        Ok((records, record_count))
+    }
+
+    pub async fn get_service(&self, service_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Service/{service_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    pub async fn list_service_categories(&self) -> Result<Vec<Value>, String> {
+        let value = self.get_no_params("/api/ServiceCategory").await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn list_service_statuses(&self, service_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = service_id {
+            params.push(("service_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/ServiceStatus", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn create_service_status(&self, status: Value) -> Result<Value, String> {
+        self.post("/api/ServiceStatus", &json!([status])).await
+    }
+
+    // --- Invoice & Order Extras (endpoints guessed from HaloPSA's naming
+    // convention; NOT confirmed against a real capture. review_expense and
+    // expire_client_prepay are financial actions with real-world
+    // consequences — implemented but never invoked here) ---
+
+    pub async fn list_invoice_statuses(&self) -> Result<Vec<Value>, String> {
+        let value = self.get_no_params("/api/InvoiceStatus").await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_invoice_status(&self, status_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/InvoiceStatus/{status_id}"), &[]).await
+    }
+
+    pub async fn create_invoice_status(&self, status: Value) -> Result<Value, String> {
+        self.post("/api/InvoiceStatus", &json!([status])).await
+    }
+
+    pub async fn delete_invoice_status(&self, status_id: i64) -> Result<(), String> {
+        self.delete(&format!("/api/InvoiceStatus/{status_id}"), &[]).await
+    }
+
+    pub async fn update_invoice_lines(&self, lines: Value) -> Result<Value, String> {
+        self.post("/api/InvoiceLine", &lines).await
+    }
+
+    pub async fn update_sales_order_lines(&self, lines: Value) -> Result<Value, String> {
+        self.post("/api/SalesOrderLine", &lines).await
+    }
+
+    pub async fn register_invoice_view(&self, invoice_id: i64) -> Result<Value, String> {
+        self.post("/api/InvoiceView", &json!({ "invoice_id": invoice_id })).await
+    }
+
+    pub async fn register_sales_order_view(&self, sales_order_id: i64) -> Result<Value, String> {
+        self.post("/api/SalesOrderView", &json!({ "salesorder_id": sales_order_id }))
+            .await
+    }
+
+    pub async fn register_purchase_order_view(&self, purchase_order_id: i64) -> Result<Value, String> {
+        self.post(
+            "/api/PurchaseOrderView",
+            &json!({ "purchaseorder_id": purchase_order_id }),
+        )
+        .await
+    }
+
+    pub async fn register_kb_article_view(&self, kb_article_id: i64) -> Result<Value, String> {
+        self.post("/api/KBArticleView", &json!({ "kbarticle_id": kb_article_id }))
+            .await
+    }
+
+    pub async fn review_expense(&self, expense_ids: &[i64]) -> Result<Value, String> {
+        let body: Vec<Value> = expense_ids
+            .iter()
+            .map(|id| json!({ "id": id, "reviewed": true }))
+            .collect();
+        self.post("/api/Expense", &json!(body)).await
+    }
+
+    pub async fn expire_client_prepay(&self, prepay_ids: &[i64]) -> Result<Value, String> {
+        let body: Vec<Value> = prepay_ids
+            .iter()
+            .map(|id| json!({ "id": id, "expired": true }))
+            .collect();
+        self.post("/api/ClientPrepay", &json!(body)).await
+    }
+
+    // --- Integration Management (endpoints guessed from HaloPSA's naming
+    // convention; real field shapes for list_integration_configs
+    // confirmed via StackJack reference, endpoint path itself unconfirmed) ---
+
+    pub async fn list_integration_configs(&self) -> Result<Vec<Value>, String> {
+        let value = self.get_no_params("/api/Integration").await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_integration_config(&self, config_id: i64) -> Result<Value, String> {
+        self.get_raw(
+            &format!("/api/Integration/{config_id}"),
+            &[("includedetails", "true".into())],
+        )
+        .await
+    }
+
+    pub async fn list_integration_site_mappings(&self, module_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = module_id {
+            params.push(("module_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/IntegrationSiteMapping", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn list_integration_errors(
+        &self,
+        module_id: Option<i64>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(200).to_string()),
+        ];
+        if let Some(id) = module_id {
+            params.push(("module_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/IntegrationError", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_integration_error(&self, error_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/IntegrationError/{error_id}"), &[]).await
+    }
+
+    pub async fn list_integration_requests(
+        &self,
+        module_id: Option<i64>,
+        page: i64,
+        page_size: i64,
+    ) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(200).to_string()),
+        ];
+        if let Some(id) = module_id {
+            params.push(("module_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/IntegrationRequest", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_integration_request(&self, request_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/IntegrationRequest/{request_id}"), &[]).await
+    }
+
+    pub async fn list_integration_field_mappings(&self, module_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = module_id {
+            params.push(("module_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/IntegrationFieldMapping", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    // --- Integration Data (third-party passthrough proxies — highest
+    // uncertainty in this batch: endpoint guessed, AND depends on which
+    // integrations are actually configured/authorized on this tenant.
+    // list_integration_configs can be used to check connection status
+    // first) ---
+
+    async fn get_integration_data(
+        &self,
+        system: &str,
+        datatype: Option<&str>,
+        search: Option<&str>,
+    ) -> Result<Value, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(dt) = datatype {
+            params.push(("datatype", dt.to_string()));
+        }
+        if let Some(s) = search {
+            params.push(("search", s.to_string()));
+        }
+        self.get_raw(&format!("/api/{system}"), &params).await
+    }
+
+    pub async fn get_microsoft_csp_data(&self, datatype: Option<&str>, search: Option<&str>) -> Result<Value, String> {
+        self.get_integration_data("MicrosoftCSP", datatype, search).await
+    }
+
+    pub async fn get_intune_data(&self, datatype: Option<&str>, search: Option<&str>) -> Result<Value, String> {
+        self.get_integration_data("Intune", datatype, search).await
+    }
+
+    pub async fn get_azure_ad_data(&self, datatype: Option<&str>, search: Option<&str>) -> Result<Value, String> {
+        self.get_integration_data("AzureAD", datatype, search).await
+    }
+
+    pub async fn get_ninja_rmm_data(&self) -> Result<Value, String> {
+        self.get_no_params("/api/NinjaRMM").await
+    }
+
+    pub async fn get_xero_data(&self, datatype: Option<&str>, search: Option<&str>) -> Result<Value, String> {
+        self.get_integration_data("Xero", datatype, search).await
+    }
+
+    // --- Accounting Details (endpoint guessed; NOT confirmed) ---
+
+    pub async fn list_xero_details(&self, page: i64, page_size: i64) -> Result<Vec<Value>, String> {
+        let params: Vec<(&str, String)> = vec![
+            ("pageinate", "true".into()),
+            ("page_no", page.to_string()),
+            ("page_size", page_size.max(1).min(100).to_string()),
+        ];
+        let value = self.get_raw("/api/XeroDetail", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
+    pub async fn get_xero_detail(&self, detail_id: i64) -> Result<Value, String> {
+        self.get_raw(&format!("/api/XeroDetail/{detail_id}"), &[]).await
+    }
+
+    // --- Integration Sync (endpoint guessed; NOT confirmed) ---
+
+    pub async fn send_invoice_to_xero(&self, invoice_id: i64) -> Result<Value, String> {
+        self.post("/api/Xero/SendInvoice", &json!({ "invoice_id": invoice_id }))
+            .await
+    }
+
+    // --- Assets (remaining write operations + software inventory). Same
+    // confirmed /api/Asset base path as the existing get_asset/list_assets
+    // for create/update; list_asset_software endpoint itself guessed ---
+
+    pub async fn create_asset(&self, asset: Value) -> Result<Value, String> {
+        self.post("/api/Asset", &json!([asset])).await
+    }
+
+    pub async fn update_asset(&self, asset_id: i64, mut fields: Value) -> Result<Value, String> {
+        if let Some(obj) = fields.as_object_mut() {
+            obj.insert("id".into(), json!(asset_id));
+        }
+        self.post("/api/Asset", &json!([fields])).await
+    }
+
+    pub async fn list_asset_software(&self, asset_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![];
+        if let Some(id) = asset_id {
+            params.push(("device_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/AssetSoftware", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
     // --- Roles (endpoints guessed from HaloPSA's naming convention; NOT
     // confirmed against a real capture, flag for retest) ---
 
