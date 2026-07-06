@@ -106,6 +106,9 @@ impl HaloPSAClient {
         filters: &TicketFilter,
     ) -> Result<(Vec<Value>, i64), String> {
         let mut params: Vec<(&str, String)> = vec![
+            // HaloPSA ignores page_size on this endpoint unless pageinate=true
+            // is also set (same quirk confirmed on /api/Client).
+            ("pageinate", "true".into()),
             ("page_no", page.to_string()),
             ("page_size", page_size.max(1).min(100).to_string()),
             ("includecolumns", "true".into()),
@@ -158,7 +161,10 @@ impl HaloPSAClient {
         let record_count = value.get("record_count")
             .and_then(|v| v.as_i64())
             .unwrap_or(0);
-        let records = parse_halo_list::<Value>(value);
+        let mut records = parse_halo_list::<Value>(value);
+        // Some HaloPSA instances/endpoints ignore page_size server-side even
+        // with pageinate=true set — truncate client-side as a safety net.
+        records.truncate(page_size.max(1) as usize);
 
         Ok((records, record_count))
     }
@@ -570,7 +576,10 @@ impl HaloPSAClient {
         ];
         let value = self.get_raw("/api/Invoice", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
-        let invoices = parse_halo_list::<Value>(value);
+        let mut invoices = parse_halo_list::<Value>(value);
+        // /api/Invoice ignores page_size server-side — truncate client-side
+        // to bound the number of invoices whose lines we flatten below.
+        invoices.truncate(page_size.max(1) as usize);
         let lines: Vec<Value> = invoices
             .iter()
             .flat_map(|inv| {
@@ -1087,7 +1096,10 @@ impl HaloPSAClient {
             ("page_size", page_size.max(1).min(100).to_string()),
         ];
         let value = self.get_raw("/api/Workflow", &params).await?;
-        Ok(parse_halo_list::<Value>(value))
+        let mut records = parse_halo_list::<Value>(value);
+        // /api/Workflow ignores page_size server-side — truncate client-side.
+        records.truncate(page_size.max(1) as usize);
+        Ok(records)
     }
 
     /// Get full raw workflow details by ID. Same confirmed endpoint as the
@@ -1134,7 +1146,10 @@ impl HaloPSAClient {
             params.push(("agent_id", id.to_string()));
         }
         let value = self.get_raw("/api/Notification", &params).await?;
-        Ok(parse_halo_list::<Value>(value))
+        let mut records = parse_halo_list::<Value>(value);
+        // /api/Notification ignores page_size server-side — truncate client-side.
+        records.truncate(page_size.max(1) as usize);
+        Ok(records)
     }
 
     pub async fn get_notification(&self, notification_id: i64) -> Result<Value, String> {
@@ -1491,7 +1506,10 @@ impl HaloPSAClient {
             params.push(("search", s.to_string()));
         }
         let value = self.get_raw("/api/Tags", &params).await?;
-        Ok(parse_halo_list::<Value>(value))
+        let mut records = parse_halo_list::<Value>(value);
+        // /api/Tags ignores page_size server-side — truncate client-side.
+        records.truncate(page_size.max(1) as usize);
+        Ok(records)
     }
 
     pub async fn get_tag(&self, tag_id: i64) -> Result<Value, String> {
@@ -1516,7 +1534,10 @@ impl HaloPSAClient {
             ("page_size", page_size.max(1).min(200).to_string()),
         ];
         let value = self.get_raw("/api/ItemGroup", &params).await?;
-        Ok(parse_halo_list::<Value>(value))
+        let mut records = parse_halo_list::<Value>(value);
+        // /api/ItemGroup ignores page_size server-side — truncate client-side.
+        records.truncate(page_size.max(1) as usize);
+        Ok(records)
     }
 
     pub async fn get_item_group(&self, group_id: i64) -> Result<Value, String> {
@@ -1684,9 +1705,19 @@ impl HaloPSAClient {
         Ok(parse_halo_list::<Value>(value))
     }
 
+    /// List the current agent's timesheets. The guessed `mine=true` query
+    /// param is silently ignored by this endpoint (confirmed: returned the
+    /// same unfiltered dataset as list_timesheets with no agent_id) — use
+    /// the confirmed-working agent_id filter instead, resolved via get_me.
     pub async fn get_my_timesheets(&self) -> Result<Vec<Value>, String> {
-        let value = self.get_raw("/api/Timesheet", &[("mine", "true".into())]).await?;
-        Ok(parse_halo_list::<Value>(value))
+        let me = self.get_me().await?;
+        let agent_id = me
+            .get("agentid")
+            .or_else(|| me.get("agent_id"))
+            .or_else(|| me.get("id"))
+            .and_then(|v| v.as_i64())
+            .ok_or("Could not resolve your agent ID from get_me")?;
+        self.list_timesheets(Some(agent_id)).await
     }
 
     pub async fn get_timesheet(&self, timesheet_id: i64) -> Result<Value, String> {
@@ -1924,9 +1955,17 @@ impl HaloPSAClient {
     /// List the steps (and their available transition actions) for a
     /// workflow. Thin wrapper over the existing get_workflow — no new
     /// endpoint, just exposing data we already fetch.
-    pub async fn list_workflow_steps(&self, workflow_id: i64) -> Result<Vec<WorkflowStep>, String> {
-        let workflow = self.get_workflow(workflow_id).await?;
-        Ok(workflow.steps)
+    /// List a workflow's steps. Uses the same lenient raw-JSON path as
+    /// get_workflow_details (not the strict typed get_workflow) because
+    /// some workflows' step/stage/action objects omit fields the typed
+    /// Workflow struct requires, which hard-fails deserialization.
+    pub async fn list_workflow_steps(&self, workflow_id: i64) -> Result<Vec<Value>, String> {
+        let workflow = self.get_workflow_details(workflow_id).await?;
+        Ok(workflow
+            .get("steps")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default())
     }
 
     /// Run a saved report by ID and return the full response, including
@@ -2108,7 +2147,9 @@ impl HaloPSAClient {
         ];
         let value = self.get_raw("/api/Agent", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
-        let records = parse_halo_list::<Value>(value);
+        let mut records = parse_halo_list::<Value>(value);
+        // /api/Agent ignores page_size server-side — truncate client-side.
+        records.truncate(page_size.max(1) as usize);
         Ok((records, record_count))
     }
 
@@ -2122,8 +2163,16 @@ impl HaloPSAClient {
             ("page_size", page_size.max(1).min(100).to_string()),
         ];
         let value = self.get_raw("/api/AssetGroup", &params).await?;
-        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
-        let records = parse_halo_list::<Value>(value);
+        let mut records = parse_halo_list::<Value>(value.clone());
+        // record_count is unreliable on this endpoint (observed 0 despite
+        // non-empty records) — fall back to the untruncated record count.
+        let record_count = value
+            .get("record_count")
+            .and_then(|v| v.as_i64())
+            .filter(|&c| c > 0)
+            .unwrap_or(records.len() as i64);
+        // /api/AssetGroup ignores page_size server-side — truncate client-side.
+        records.truncate(page_size.max(1) as usize);
         Ok((records, record_count))
     }
 

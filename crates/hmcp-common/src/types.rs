@@ -109,6 +109,10 @@ pub struct Action {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workflow {
+    // Some HaloPSA workflow objects omit id on nested steps/stages/actions
+    // (observed: "missing field id" deserialization failures) — default to
+    // 0 rather than hard-failing the whole workflow parse.
+    #[serde(default)]
     pub id: i64,
     #[serde(default)]
     pub name: String,
@@ -120,6 +124,10 @@ pub struct Workflow {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowStep {
+    // Some HaloPSA workflow objects omit id on nested steps/stages/actions
+    // (observed: "missing field id" deserialization failures) — default to
+    // 0 rather than hard-failing the whole workflow parse.
+    #[serde(default)]
     pub id: i64,
     #[serde(default)]
     pub name: String,
@@ -131,6 +139,10 @@ pub struct WorkflowStep {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowAction {
+    // Some HaloPSA workflow objects omit id on nested steps/stages/actions
+    // (observed: "missing field id" deserialization failures) — default to
+    // 0 rather than hard-failing the whole workflow parse.
+    #[serde(default)]
     pub id: i64,
     #[serde(default)]
     pub action_name: String,
@@ -154,6 +166,10 @@ pub struct WorkflowAction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowStage {
+    // Some HaloPSA workflow objects omit id on nested steps/stages/actions
+    // (observed: "missing field id" deserialization failures) — default to
+    // 0 rather than hard-failing the whole workflow parse.
+    #[serde(default)]
     pub id: i64,
     #[serde(default)]
     pub name: String,

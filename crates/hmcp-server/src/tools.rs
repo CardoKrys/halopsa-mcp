@@ -552,9 +552,10 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "datatype": { "type": "string", "description": "Data category, e.g. subscriptions, products, companies (optional)" },
+                    "datatype": { "type": "string", "description": "Data category, e.g. subscriptions, products, companies. Required — this endpoint 400s if omitted." },
                     "search": { "type": "string", "description": "Free-text search (optional)" }
-                }
+                },
+                "required": ["datatype"]
             }
         }),
         json!({
@@ -986,9 +987,10 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "datatype": { "type": "string", "description": "Data category, e.g. subscriptions, licences, customers (optional)" },
+                    "datatype": { "type": "string", "description": "Data category, e.g. subscriptions, licences, customers. Required — this endpoint 400s if omitted." },
                     "search": { "type": "string", "description": "Free-text search (optional)" }
-                }
+                },
+                "required": ["datatype"]
             }
         }),
         json!({
@@ -997,9 +999,10 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "datatype": { "type": "string", "description": "Data category, e.g. devices, compliancepolicies, apps (optional)" },
+                    "datatype": { "type": "string", "description": "Data category, e.g. devices, compliancepolicies, apps. Required — this endpoint 400s if omitted." },
                     "search": { "type": "string", "description": "Free-text search (optional)" }
-                }
+                },
+                "required": ["datatype"]
             }
         }),
         json!({
@@ -1008,9 +1011,10 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "datatype": { "type": "string", "description": "Data category, e.g. users, groups, licenses (optional)" },
+                    "datatype": { "type": "string", "description": "Data category, e.g. users, groups, licenses. Required — this endpoint 400s if omitted." },
                     "search": { "type": "string", "description": "Free-text search (optional)" }
-                }
+                },
+                "required": ["datatype"]
             }
         }),
         json!({
@@ -1024,9 +1028,10 @@ pub fn tool_definitions() -> Vec<Value> {
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "datatype": { "type": "string", "description": "Data category, e.g. invoices, contacts, payments (optional)" },
+                    "datatype": { "type": "string", "description": "Data category, e.g. invoices, contacts, payments. Required — this endpoint 400s if omitted." },
                     "search": { "type": "string", "description": "Free-text search (optional)" }
-                }
+                },
+                "required": ["datatype"]
             }
         }),
         json!({
@@ -2534,6 +2539,7 @@ async fn exec_list_my_tickets(args: &Value, client: &HaloPSAClient) -> Result<St
     let agent_id = me
         .get("agentid")
         .or_else(|| me.get("agent_id"))
+        .or_else(|| me.get("id"))
         .and_then(|v| v.as_i64())
         .ok_or("Could not resolve your agent ID from get_me — fall back to list_tickets with an explicit agent_id")?;
 
@@ -2909,9 +2915,9 @@ async fn exec_get_field(args: &Value, client: &HaloPSAClient) -> Result<String, 
 }
 
 async fn exec_get_pax8_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let datatype = args.get("datatype").and_then(|v| v.as_str()).ok_or("datatype is required")?;
     let search = args.get("search").and_then(|v| v.as_str());
-    let result = client.get_pax8_data(datatype, search).await?;
+    let result = client.get_pax8_data(Some(datatype), search).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3219,23 +3225,23 @@ async fn exec_list_integration_field_mappings(args: &Value, client: &HaloPSAClie
 }
 
 async fn exec_get_microsoft_csp_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let datatype = args.get("datatype").and_then(|v| v.as_str()).ok_or("datatype is required")?;
     let search = args.get("search").and_then(|v| v.as_str());
-    let result = client.get_microsoft_csp_data(datatype, search).await?;
+    let result = client.get_microsoft_csp_data(Some(datatype), search).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_get_intune_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let datatype = args.get("datatype").and_then(|v| v.as_str()).ok_or("datatype is required")?;
     let search = args.get("search").and_then(|v| v.as_str());
-    let result = client.get_intune_data(datatype, search).await?;
+    let result = client.get_intune_data(Some(datatype), search).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_get_azure_ad_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let datatype = args.get("datatype").and_then(|v| v.as_str()).ok_or("datatype is required")?;
     let search = args.get("search").and_then(|v| v.as_str());
-    let result = client.get_azure_ad_data(datatype, search).await?;
+    let result = client.get_azure_ad_data(Some(datatype), search).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3245,9 +3251,9 @@ async fn exec_get_ninja_rmm_data(client: &HaloPSAClient) -> Result<String, Strin
 }
 
 async fn exec_get_xero_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let datatype = args.get("datatype").and_then(|v| v.as_str());
+    let datatype = args.get("datatype").and_then(|v| v.as_str()).ok_or("datatype is required")?;
     let search = args.get("search").and_then(|v| v.as_str());
-    let result = client.get_xero_data(datatype, search).await?;
+    let result = client.get_xero_data(Some(datatype), search).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3814,7 +3820,7 @@ async fn exec_list_billing_lines(args: &Value, client: &HaloPSAClient) -> Result
 
     Ok(serde_json::to_string_pretty(&json!({
         "billing_lines": lines,
-        "invoice_total_count": total,
+        "total_count": total,
         "page": page,
         "page_size": page_size,
     }))
