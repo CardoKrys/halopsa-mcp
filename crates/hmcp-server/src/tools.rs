@@ -2354,6 +2354,31 @@ pub async fn execute_tool(
 
 // --- Tool implementations ---
 
+/// HaloPSA embeds plaintext auto-generated credentials in some responses —
+/// e.g. creating a client auto-provisions a default portal contact and
+/// returns its password as `new_password` nested under `site_update[].
+/// users_update[]`. Strip these recursively before any client/site/user/
+/// supplier object reaches the model or conversation transcript.
+fn redact_secrets(value: &mut Value) {
+    const SENSITIVE_KEYS: &[&str] = &["new_password", "password", "passwordconfirm"];
+    match value {
+        Value::Object(map) => {
+            for key in SENSITIVE_KEYS {
+                map.remove(*key);
+            }
+            for v in map.values_mut() {
+                redact_secrets(v);
+            }
+        }
+        Value::Array(arr) => {
+            for v in arr.iter_mut() {
+                redact_secrets(v);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn summarize_tickets(tickets: &[Value]) -> Vec<Value> {
     tickets
         .iter()
@@ -2830,13 +2855,15 @@ async fn exec_list_suppliers(args: &Value, client: &HaloPSAClient) -> Result<Str
 
 async fn exec_get_supplier(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let supplier_id = args.get("supplier_id").and_then(|v| v.as_i64()).ok_or("supplier_id is required")?;
-    let result = client.get_supplier(supplier_id).await?;
+    let mut result = client.get_supplier(supplier_id).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_create_supplier(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let fields = args.get("fields").cloned().ok_or("fields is required")?;
-    let result = client.create_supplier(fields).await?;
+    let mut result = client.create_supplier(fields).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -2844,7 +2871,8 @@ async fn exec_create_supplier_user(args: &Value, client: &HaloPSAClient) -> Resu
     let supplier_id = args.get("supplier_id").and_then(|v| v.as_i64()).ok_or("supplier_id is required")?;
     let supplier_name = args.get("supplier_name").and_then(|v| v.as_str()).ok_or("supplier_name is required")?;
     let fields = args.get("fields").cloned().ok_or("fields is required")?;
-    let result = client.create_supplier_user(supplier_id, supplier_name, fields).await?;
+    let mut result = client.create_supplier_user(supplier_id, supplier_name, fields).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -2956,7 +2984,8 @@ async fn exec_list_view_columns(args: &Value, client: &HaloPSAClient) -> Result<
 
 async fn exec_create_client(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let fields = args.get("fields").cloned().ok_or("fields is required")?;
-    let result = client.create_client(fields).await?;
+    let mut result = client.create_client(fields).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3534,7 +3563,8 @@ async fn exec_update_client(args: &Value, client: &HaloPSAClient) -> Result<Stri
     let client_id = args.get("client_id").and_then(|v| v.as_i64()).ok_or("client_id is required")?;
     let fields = args.get("fields").cloned().unwrap_or(json!({}));
 
-    let result = client.update_client(client_id, fields).await?;
+    let mut result = client.update_client(client_id, fields).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3839,7 +3869,8 @@ async fn exec_get_client(args: &Value, client: &HaloPSAClient) -> Result<String,
         .and_then(|v| v.as_i64())
         .ok_or("client_id is required")?;
 
-    let result = client.get_client(client_id).await?;
+    let mut result = client.get_client(client_id).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3848,7 +3879,10 @@ async fn exec_list_clients(args: &Value, client: &HaloPSAClient) -> Result<Strin
     let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
     let search = args.get("search").and_then(|v| v.as_str());
 
-    let (clients, total) = client.list_clients(page, page_size, search).await?;
+    let (mut clients, total) = client.list_clients(page, page_size, search).await?;
+    for c in clients.iter_mut() {
+        redact_secrets(c);
+    }
 
     Ok(serde_json::to_string_pretty(&json!({
         "clients": clients,
@@ -3869,7 +3903,10 @@ async fn exec_search_clients(args: &Value, client: &HaloPSAClient) -> Result<Str
         .and_then(|v| v.as_i64())
         .unwrap_or(20);
 
-    let (clients, total) = client.search_clients(query, page_size).await?;
+    let (mut clients, total) = client.search_clients(query, page_size).await?;
+    for c in clients.iter_mut() {
+        redact_secrets(c);
+    }
 
     Ok(serde_json::to_string_pretty(&json!({
         "results": clients,
@@ -3884,7 +3921,10 @@ async fn exec_list_users(args: &Value, client: &HaloPSAClient) -> Result<String,
     let client_id = args.get("client_id").and_then(|v| v.as_i64());
     let search = args.get("search").and_then(|v| v.as_str());
 
-    let (users, total) = client.list_users(page, page_size, client_id, search).await?;
+    let (mut users, total) = client.list_users(page, page_size, client_id, search).await?;
+    for u in users.iter_mut() {
+        redact_secrets(u);
+    }
 
     Ok(serde_json::to_string_pretty(&json!({
         "users": users,
@@ -3901,7 +3941,8 @@ async fn exec_get_user(args: &Value, client: &HaloPSAClient) -> Result<String, S
         .and_then(|v| v.as_i64())
         .ok_or("user_id is required")?;
 
-    let result = client.get_user(user_id).await?;
+    let mut result = client.get_user(user_id).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3915,7 +3956,10 @@ async fn exec_search_users(args: &Value, client: &HaloPSAClient) -> Result<Strin
         .and_then(|v| v.as_i64())
         .unwrap_or(20);
 
-    let (users, total) = client.search_users(query, page_size).await?;
+    let (mut users, total) = client.search_users(query, page_size).await?;
+    for u in users.iter_mut() {
+        redact_secrets(u);
+    }
 
     Ok(serde_json::to_string_pretty(&json!({
         "results": users,
@@ -3964,7 +4008,12 @@ async fn exec_get_agent(args: &Value, client: &HaloPSAClient) -> Result<String, 
         .and_then(|v| v.as_i64())
         .ok_or("agent_id is required")?;
 
-    let result = client.get_agent(agent_id).await?;
+    let mut result = client.get_agent(agent_id).await?;
+    // Same bloat as get_me for admin agents — strip before returning.
+    if let Some(obj) = result.as_object_mut() {
+        obj.remove("access_control");
+        obj.remove("claims");
+    }
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -4069,7 +4118,16 @@ async fn exec_run_report(args: &Value, client: &HaloPSAClient) -> Result<String,
 }
 
 async fn exec_get_me(client: &HaloPSAClient) -> Result<String, String> {
-    let result = client.get_me().await?;
+    let mut result = client.get_me().await?;
+    // Full admin agents carry thousands of ACL rows and permission claims
+    // here (observed: 2.8MB / ~97k lines for a global-admin sandbox agent),
+    // which blows past MCP client output limits. Neither field is used by
+    // identity-resolution callers (only id/agentid/name/email are), so drop
+    // them from the tool-facing response.
+    if let Some(obj) = result.as_object_mut() {
+        obj.remove("access_control");
+        obj.remove("claims");
+    }
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -4212,7 +4270,8 @@ async fn exec_create_site(args: &Value, client: &HaloPSAClient) -> Result<String
         site["delivery_address"] = addr;
     }
 
-    let result = client.create_site(site).await?;
+    let mut result = client.create_site(site).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -4232,7 +4291,8 @@ async fn exec_update_site(args: &Value, client: &HaloPSAClient) -> Result<String
         fields["delivery_address"] = addr;
     }
 
-    let result = client.update_site(site_id, fields).await?;
+    let mut result = client.update_site(site_id, fields).await?;
+    redact_secrets(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
