@@ -713,10 +713,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_notification",
-            "description": "Create a new notification rule. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a new notification rule. Confirmed against the live sandbox: the rule's title field is `name` (not `subject`), and `eventno` (an integer trigger-event enum, e.g. 1 = New Ticket Logged) is required — HaloPSA rejects the request with 'Please select an event to trigger the Notification' without it. Use get_notification/list_notifications on an existing rule with the desired trigger to find the eventno value, since the enum isn't otherwise documented.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "Notification fields, e.g. { \"subject\": \"VIP escalation\", \"agent_id\": 12 }" } },
+                "properties": { "fields": { "type": "object", "description": "Notification fields, e.g. { \"name\": \"VIP escalation\", \"eventno\": 1, \"agent_id\": 12 }" } },
                 "required": ["fields"]
             }
         }),
