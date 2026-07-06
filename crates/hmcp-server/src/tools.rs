@@ -2408,6 +2408,8 @@ async fn exec_list_tickets(args: &Value, client: &HaloPSAClient) -> Result<Strin
         tickettype_id: args.get("tickettype_id").and_then(|v| v.as_i64()),
         open_only: args.get("open_only").and_then(|v| v.as_bool()).unwrap_or(false),
         priority: args.get("priority").and_then(|v| v.as_str()).map(String::from),
+        ticketarea_id: args.get("ticketarea_id").and_then(|v| v.as_i64()),
+        parent_id: args.get("parent_id").and_then(|v| v.as_i64()),
     };
 
     let (tickets, total) = client.list_tickets(page, page_size, &filter).await?;
