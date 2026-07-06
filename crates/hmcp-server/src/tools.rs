@@ -374,36 +374,8 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
-            "name": "list_software_licences",
-            "description": "List software licence records (e.g. Microsoft 365, Office 365) with seat counts and assigned client. Endpoint unconfirmed against this sandbox — flag results as unverified.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
-                    "page_size": { "type": "integer", "description": "Results per page (1-200, default 50)", "default": 50 },
-                    "client_id": { "type": "integer", "description": "Filter by client ID (optional)" }
-                }
-            }
-        }),
-        json!({
-            "name": "get_software_licence",
-            "description": "Get full details of a single software licence by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
-            "inputSchema": {
-                "type": "object",
-                "properties": {
-                    "licence_id": { "type": "integer", "description": "The software licence ID" }
-                },
-                "required": ["licence_id"]
-            }
-        }),
-        json!({
             "name": "list_charge_rates",
             "description": "List charge types (Configuration > Billing > Charge Types) used to categorize billable ticket actions, e.g. 'SD - Remote Reactive Support', 'FIELD - Travel'.",
-            "inputSchema": { "type": "object", "properties": {} }
-        }),
-        json!({
-            "name": "get_system_info",
-            "description": "Get HaloPSA instance/system metadata (version, tenant, service URLs). Endpoint unconfirmed against this sandbox — flag results as unverified.",
             "inputSchema": { "type": "object", "properties": {} }
         }),
         json!({
@@ -431,14 +403,6 @@ pub fn tool_definitions() -> Vec<Value> {
                     "asset_id": { "type": "integer", "description": "Filter by asset ID (optional)" },
                     "count": { "type": "integer", "description": "Max results (default 200)", "default": 200 }
                 }
-            }
-        }),
-        json!({
-            "name": "list_device_licences",
-            "description": "List software licences assigned to a device/asset. Reuses the same base path as list_software_licences with a device filter.",
-            "inputSchema": {
-                "type": "object",
-                "properties": { "device_id": { "type": "integer", "description": "Filter by device/asset ID (optional)" } }
             }
         }),
         json!({
@@ -646,10 +610,14 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_view_columns",
-            "description": "List available column definitions for a view domain. Endpoint guessed — unconfirmed against this sandbox (list_view_filters itself is confirmed).",
+            "description": "List available column definitions for a view type. Confirmed via sandbox capture (Edit Columns on a ticket list) — same params as list_view_filters.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "domain": { "type": "string", "description": "Entity domain, e.g. 'tickets', 'assets' (optional)" } }
+                "properties": {
+                    "view_type": { "type": "string", "description": "View type, e.g. 'reqs' (tickets), 'opps' (opportunities)" },
+                    "ticketarea_id": { "type": "integer", "description": "Filter by ticket area ID (optional)" }
+                },
+                "required": ["view_type"]
             }
         }),
         json!({
@@ -1019,8 +987,15 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "get_ninja_rmm_data",
-            "description": "Retrieve NinjaRMM data from a connected NinjaRMM integration. list_integration_configs shows this integration IS currently authorized on production, unlike most other Integration Data tools in this batch.",
-            "inputSchema": { "type": "object", "properties": {} }
+            "description": "Retrieve NinjaOne (formerly NinjaRMM) data from a connected NinjaOne integration — confirmed active in this sandbox via Config > Integrations.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "datatype": { "type": "string", "description": "Data category, e.g. devices, organizations. Required — this endpoint 400s if omitted." },
+                    "search": { "type": "string", "description": "Free-text search (optional)" }
+                },
+                "required": ["datatype"]
+            }
         }),
         json!({
             "name": "get_xero_data",
@@ -1086,10 +1061,11 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_asset_software",
-            "description": "List software discovered on assets, optionally filtered by device. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "List software discovered on a specific asset. Confirmed via sandbox capture — there's no standalone software resource, this reads the software inventory embedded in the asset's own record.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "asset_id": { "type": "integer", "description": "Filter by asset/device ID (optional)" } }
+                "properties": { "asset_id": { "type": "integer", "description": "The asset/device ID" } },
+                "required": ["asset_id"]
             }
         }),
         json!({
@@ -2186,7 +2162,6 @@ pub async fn execute_tool(
         "global_search" => exec_global_search(args, client).await,
         "list_field_groups" => exec_list_field_groups(client).await,
         "list_asset_changes" => exec_list_asset_changes(args, client).await,
-        "list_device_licences" => exec_list_device_licences(args, client).await,
         "create_invoice" => exec_create_invoice(args, client).await,
         "void_invoice" => exec_void_invoice(args, client).await,
         "list_suppliers" => exec_list_suppliers(args, client).await,
@@ -2249,7 +2224,7 @@ pub async fn execute_tool(
         "get_microsoft_csp_data" => exec_get_microsoft_csp_data(args, client).await,
         "get_intune_data" => exec_get_intune_data(args, client).await,
         "get_azure_ad_data" => exec_get_azure_ad_data(args, client).await,
-        "get_ninja_rmm_data" => exec_get_ninja_rmm_data(client).await,
+        "get_ninja_rmm_data" => exec_get_ninja_rmm_data(args, client).await,
         "get_xero_data" => exec_get_xero_data(args, client).await,
         "list_xero_details" => exec_list_xero_details(args, client).await,
         "get_xero_detail" => exec_get_xero_detail(args, client).await,
@@ -2322,10 +2297,7 @@ pub async fn execute_tool(
         "get_custom_table" => exec_get_custom_table(args, client).await,
         "create_custom_table" => exec_create_custom_table(args, client).await,
         "delete_custom_table" => exec_delete_custom_table(args, client).await,
-        "list_software_licences" => exec_list_software_licences(args, client).await,
-        "get_software_licence" => exec_get_software_licence(args, client).await,
         "list_charge_rates" => exec_list_charge_rates(client).await,
-        "get_system_info" => exec_get_system_info(client).await,
         "list_billing_lines" => exec_list_billing_lines(args, client).await,
         "list_invoices" => exec_list_invoices(args, client).await,
         "list_recurring_invoices" => exec_list_recurring_invoices(args, client).await,
@@ -2838,12 +2810,6 @@ async fn exec_list_asset_changes(args: &Value, client: &HaloPSAClient) -> Result
     Ok(serde_json::to_string_pretty(&json!({ "changes": changes })).unwrap())
 }
 
-async fn exec_list_device_licences(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let device_id = args.get("device_id").and_then(|v| v.as_i64());
-    let licences = client.list_device_licences(device_id).await?;
-    Ok(serde_json::to_string_pretty(&json!({ "licences": licences })).unwrap())
-}
-
 async fn exec_create_invoice(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let fields = args.get("fields").cloned().ok_or("fields is required")?;
     let result = client.create_invoice(fields).await?;
@@ -2982,8 +2948,9 @@ async fn exec_list_view_filters(args: &Value, client: &HaloPSAClient) -> Result<
 }
 
 async fn exec_list_view_columns(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let domain = args.get("domain").and_then(|v| v.as_str());
-    let columns = client.list_view_columns(domain).await?;
+    let view_type = args.get("view_type").and_then(|v| v.as_str()).ok_or("view_type is required")?;
+    let ticketarea_id = args.get("ticketarea_id").and_then(|v| v.as_i64());
+    let columns = client.list_view_columns(view_type, ticketarea_id).await?;
     Ok(serde_json::to_string_pretty(&json!({ "columns": columns })).unwrap())
 }
 
@@ -3245,8 +3212,10 @@ async fn exec_get_azure_ad_data(args: &Value, client: &HaloPSAClient) -> Result<
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
-async fn exec_get_ninja_rmm_data(client: &HaloPSAClient) -> Result<String, String> {
-    let result = client.get_ninja_rmm_data().await?;
+async fn exec_get_ninja_rmm_data(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let datatype = args.get("datatype").and_then(|v| v.as_str()).ok_or("datatype is required")?;
+    let search = args.get("search").and_then(|v| v.as_str());
+    let result = client.get_ninja_rmm_data(Some(datatype), search).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3290,7 +3259,7 @@ async fn exec_update_asset(args: &Value, client: &HaloPSAClient) -> Result<Strin
 }
 
 async fn exec_list_asset_software(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let asset_id = args.get("asset_id").and_then(|v| v.as_i64());
+    let asset_id = args.get("asset_id").and_then(|v| v.as_i64()).ok_or("asset_id is required")?;
     let software = client.list_asset_software(asset_id).await?;
     Ok(serde_json::to_string_pretty(&json!({ "software": software })).unwrap())
 }
@@ -3776,40 +3745,9 @@ async fn exec_delete_custom_table(args: &Value, client: &HaloPSAClient) -> Resul
     Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "table_id": table_id })).unwrap())
 }
 
-async fn exec_list_software_licences(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let page = args.get("page").and_then(|v| v.as_i64()).unwrap_or(1);
-    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
-    let client_id = args.get("client_id").and_then(|v| v.as_i64());
-
-    let (licences, total) = client.list_software_licences(page, page_size, client_id).await?;
-
-    Ok(serde_json::to_string_pretty(&json!({
-        "licences": licences,
-        "total_count": total,
-        "page": page,
-        "page_size": page_size,
-    }))
-    .unwrap())
-}
-
-async fn exec_get_software_licence(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let licence_id = args
-        .get("licence_id")
-        .and_then(|v| v.as_i64())
-        .ok_or("licence_id is required")?;
-
-    let result = client.get_software_licence(licence_id).await?;
-    Ok(serde_json::to_string_pretty(&result).unwrap())
-}
-
 async fn exec_list_charge_rates(client: &HaloPSAClient) -> Result<String, String> {
     let rates = client.list_charge_rates().await?;
     Ok(serde_json::to_string_pretty(&json!({ "charge_rates": rates })).unwrap())
-}
-
-async fn exec_get_system_info(client: &HaloPSAClient) -> Result<String, String> {
-    let info = client.get_system_info().await?;
-    Ok(serde_json::to_string_pretty(&info).unwrap())
 }
 
 async fn exec_list_billing_lines(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

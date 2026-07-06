@@ -499,40 +499,6 @@ impl HaloPSAClient {
         .await
     }
 
-    /// List software licences. Endpoint path follows HaloPSA's singular
-    /// resource-name convention — NOT confirmed against a real capture
-    /// (reverse-engineered from a third-party HaloPSA MCP connector's
-    /// output shape against production Halo), flag for retest.
-    pub async fn list_software_licences(
-        &self,
-        page: i64,
-        page_size: i64,
-        client_id: Option<i64>,
-    ) -> Result<(Vec<Value>, i64), String> {
-        let mut params: Vec<(&str, String)> = vec![
-            ("pageinate", "true".into()),
-            ("page_no", page.to_string()),
-            ("page_size", page_size.max(1).min(200).to_string()),
-        ];
-        if let Some(id) = client_id {
-            params.push(("client_id", id.to_string()));
-        }
-        let value = self.get_raw("/api/Licence", &params).await?;
-        let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
-        let records = parse_halo_list::<Value>(value);
-        Ok((records, record_count))
-    }
-
-    /// Get a single software licence by ID. Same endpoint-guess caveat as
-    /// list_software_licences.
-    pub async fn get_software_licence(&self, licence_id: i64) -> Result<Value, String> {
-        self.get_raw(
-            &format!("/api/Licence/{licence_id}"),
-            &[("includedetails", "true".into())],
-        )
-        .await
-    }
-
     /// List charge types (Configuration > Billing > Charge Types, selected
     /// when billing ticket actions). Confirmed against the agent UI's own
     /// request — a Lookup table (id 17), not a dedicated ChargeRate
@@ -545,13 +511,6 @@ impl HaloPSAClient {
             )
             .await?;
         Ok(parse_halo_list::<Value>(value))
-    }
-
-    /// Get HaloPSA instance/system metadata (version, tenant, service
-    /// URLs). Endpoint path guessed — NOT confirmed against a real
-    /// capture, flag for retest.
-    pub async fn get_system_info(&self) -> Result<Value, String> {
-        self.get_no_params("/api/SystemInfo").await
     }
 
     /// List billing lines. HaloPSA has no dedicated billing-lines
@@ -872,9 +831,7 @@ impl HaloPSAClient {
         self.get_raw(&format!("/api/Report/{report_id}"), &params).await
     }
 
-    // --- Assets (audit trail / licence assignment). Endpoints guessed;
-    // list_device_licences reuses the same base path as the confirmed
-    // list_software_licences with a different filter ---
+    // --- Assets (audit trail). Endpoint guessed ---
 
     pub async fn list_asset_changes(&self, asset_id: Option<i64>, count: i64) -> Result<Vec<Value>, String> {
         let mut params: Vec<(&str, String)> = vec![("count", count.max(1).min(200).to_string())];
@@ -882,15 +839,6 @@ impl HaloPSAClient {
             params.push(("asset_id", id.to_string()));
         }
         let value = self.get_raw("/api/AssetChange", &params).await?;
-        Ok(parse_halo_list::<Value>(value))
-    }
-
-    pub async fn list_device_licences(&self, device_id: Option<i64>) -> Result<Vec<Value>, String> {
-        let mut params: Vec<(&str, String)> = vec![("pageinate", "true".into()), ("page_size", "100".into())];
-        if let Some(id) = device_id {
-            params.push(("asset_id", id.to_string()));
-        }
-        let value = self.get_raw("/api/Licence", &params).await?;
         Ok(parse_halo_list::<Value>(value))
     }
 
@@ -1010,17 +958,24 @@ impl HaloPSAClient {
         self.post("/api/ApprovalProcess", &json!([process])).await
     }
 
+    /// Confirmed via sandbox capture (Approval Processes > Process Rules):
+    /// /api/ApprovalProcessRule, with showall/global/access_control_level.
     pub async fn list_approval_rules(&self, process_id: Option<i64>) -> Result<Vec<Value>, String> {
-        let mut params: Vec<(&str, String)> = vec![];
+        let mut params: Vec<(&str, String)> = vec![
+            ("showall", "true".into()),
+            ("global", "true".into()),
+            ("access_control_level", "2".into()),
+            ("isconfig", "true".into()),
+        ];
         if let Some(id) = process_id {
             params.push(("process_id", id.to_string()));
         }
-        let value = self.get_raw("/api/ApprovalRule", &params).await?;
+        let value = self.get_raw("/api/ApprovalProcessRule", &params).await?;
         Ok(parse_halo_list::<Value>(value))
     }
 
     pub async fn create_approval_rule(&self, rule: Value) -> Result<Value, String> {
-        self.post("/api/ApprovalRule", &json!([rule])).await
+        self.post("/api/ApprovalProcessRule", &json!([rule])).await
     }
 
     // --- Saved Views. list_views and list_view_filters reuse endpoints
@@ -1056,15 +1011,15 @@ impl HaloPSAClient {
         Ok(parse_halo_list::<Value>(value))
     }
 
-    /// List available columns for saved views. Endpoint guessed — NOT
-    /// confirmed against a real capture (list_view_filters itself is
-    /// confirmed).
-    pub async fn list_view_columns(&self, domain: Option<&str>) -> Result<Vec<Value>, String> {
-        let mut params: Vec<(&str, String)> = vec![];
-        if let Some(d) = domain {
-            params.push(("domain", d.to_string()));
+    /// List available columns for saved views. Confirmed via sandbox
+    /// capture (Edit Columns on a ticket list): /api/ViewColumns (plural),
+    /// with type + ticketarea_id — same params as list_view_filters.
+    pub async fn list_view_columns(&self, view_type: &str, ticketarea_id: Option<i64>) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![("type", view_type.into())];
+        if let Some(id) = ticketarea_id {
+            params.push(("ticketarea_id", id.to_string()));
         }
-        let value = self.get_raw("/api/ViewColumn", &params).await?;
+        let value = self.get_raw("/api/ViewColumns", &params).await?;
         Ok(parse_halo_list::<Value>(value))
     }
 
@@ -1289,8 +1244,14 @@ impl HaloPSAClient {
     // convention; real field shapes for list_integration_configs
     // confirmed via StackJack reference, endpoint path itself unconfirmed) ---
 
+    /// Confirmed via sandbox capture (Config > Integrations gallery):
+    /// there is no dedicated /api/Integration* list endpoint — the same
+    /// gallery of integrations (and every other config feature) is driven
+    /// by /api/features, which reports each feature's enabled state.
     pub async fn list_integration_configs(&self) -> Result<Vec<Value>, String> {
-        let value = self.get_no_params("/api/Integration").await?;
+        let value = self
+            .get_raw("/api/features", &[("showenabled", "true".into()), ("showdisabled", "true".into()), ("isconfig", "true".into())])
+            .await?;
         Ok(parse_halo_list::<Value>(value))
     }
 
@@ -1403,8 +1364,13 @@ impl HaloPSAClient {
         self.get_integration_data("AzureAD", datatype, search).await
     }
 
-    pub async fn get_ninja_rmm_data(&self) -> Result<Value, String> {
-        self.get_no_params("/api/NinjaRMM").await
+    /// Confirmed via sandbox capture (Config > Integrations): the product
+    /// rebranded from NinjaRMM to NinjaOne, and Halo's integration is
+    /// registered under that name — reuses the confirmed IntegrationData
+    /// pattern (same as Meraki/Pax8/CSP/Intune/AzureAD) instead of the
+    /// guessed dedicated /api/NinjaRMM endpoint, which doesn't exist.
+    pub async fn get_ninja_rmm_data(&self, datatype: Option<&str>, search: Option<&str>) -> Result<Value, String> {
+        self.get_integration_data("NinjaOne", datatype, search).await
     }
 
     pub async fn get_xero_data(&self, datatype: Option<&str>, search: Option<&str>) -> Result<Value, String> {
@@ -1413,18 +1379,26 @@ impl HaloPSAClient {
 
     // --- Accounting Details (endpoint guessed; NOT confirmed) ---
 
+    /// Confirmed via sandbox capture (Config > Integrations > Xero >
+    /// Tenants, which are genuinely connected in this sandbox):
+    /// /api/xerodetails (lowercase, plural) — not /api/XeroDetail.
     pub async fn list_xero_details(&self, page: i64, page_size: i64) -> Result<Vec<Value>, String> {
         let params: Vec<(&str, String)> = vec![
+            ("showall", "true".into()),
             ("pageinate", "true".into()),
             ("page_no", page.to_string()),
             ("page_size", page_size.max(1).min(100).to_string()),
         ];
-        let value = self.get_raw("/api/XeroDetail", &params).await?;
-        Ok(parse_halo_list::<Value>(value))
+        let value = self.get_raw("/api/xerodetails", &params).await?;
+        let mut records = parse_halo_list::<Value>(value);
+        records.truncate(page_size.max(1) as usize);
+        Ok(records)
     }
 
+    /// Single-item path inferred from the confirmed /api/xerodetails list
+    /// endpoint (not independently captured) — retest if it 404s.
     pub async fn get_xero_detail(&self, detail_id: i64) -> Result<Value, String> {
-        self.get_raw(&format!("/api/XeroDetail/{detail_id}"), &[]).await
+        self.get_raw(&format!("/api/xerodetails/{detail_id}"), &[]).await
     }
 
     // --- Integration Sync (endpoint guessed; NOT confirmed) ---
@@ -1449,47 +1423,63 @@ impl HaloPSAClient {
         self.post("/api/Asset", &json!([fields])).await
     }
 
-    pub async fn list_asset_software(&self, asset_id: Option<i64>) -> Result<Vec<Value>, String> {
-        let mut params: Vec<(&str, String)> = vec![];
-        if let Some(id) = asset_id {
-            params.push(("device_id", id.to_string()));
-        }
-        let value = self.get_raw("/api/AssetSoftware", &params).await?;
-        Ok(parse_halo_list::<Value>(value))
+    /// Confirmed via sandbox capture (an Asset's "Software" tab): there is
+    /// no dedicated /api/AssetSoftware resource — the software inventory is
+    /// a "software" array embedded in the Asset itself, paginated
+    /// client-side in the UI, not via a separate API call.
+    pub async fn list_asset_software(&self, asset_id: i64) -> Result<Vec<Value>, String> {
+        let value = self
+            .get_raw(
+                &format!("/api/Asset/{asset_id}"),
+                &[("includeactivity", "true".into()), ("includedetails", "true".into())],
+            )
+            .await?;
+        Ok(value
+            .get("software")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default())
     }
 
     // --- Roles (endpoints guessed from HaloPSA's naming convention; NOT
     // confirmed against a real capture, flag for retest) ---
 
+    /// Confirmed via sandbox capture (Config > Teams & Agents > Roles):
+    /// /api/Roles (plural), with access_control_level + isconfig.
     pub async fn list_roles(&self, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
         let params: Vec<(&str, String)> = vec![
             ("pageinate", "true".into()),
             ("page_no", page.to_string()),
             ("page_size", page_size.max(1).min(100).to_string()),
+            ("access_control_level", "2".into()),
+            ("isconfig", "true".into()),
         ];
-        let value = self.get_raw("/api/Role", &params).await?;
+        let value = self.get_raw("/api/Roles", &params).await?;
         let record_count = value.get("record_count").and_then(|v| v.as_i64()).unwrap_or(0);
-        let records = parse_halo_list::<Value>(value);
+        let mut records = parse_halo_list::<Value>(value);
+        records.truncate(page_size.max(1) as usize);
         Ok((records, record_count))
     }
 
+    /// Single-item path inferred from the confirmed /api/Roles list
+    /// endpoint (not independently captured) — retest if it 404s.
     pub async fn get_role(&self, role_id: i64) -> Result<Value, String> {
-        self.get_raw(&format!("/api/Role/{role_id}"), &[("includedetails", "true".into())]).await
+        self.get_raw(&format!("/api/Roles/{role_id}"), &[("includedetails", "true".into())]).await
     }
 
     pub async fn create_role(&self, role: Value) -> Result<Value, String> {
-        self.post("/api/Role", &json!([role])).await
+        self.post("/api/Roles", &json!([role])).await
     }
 
     pub async fn update_role(&self, role_id: i64, mut fields: Value) -> Result<Value, String> {
         if let Some(obj) = fields.as_object_mut() {
             obj.insert("id".into(), json!(role_id));
         }
-        self.post("/api/Role", &json!([fields])).await
+        self.post("/api/Roles", &json!([fields])).await
     }
 
     pub async fn delete_role(&self, role_id: i64) -> Result<(), String> {
-        self.delete(&format!("/api/Role/{role_id}"), &[]).await
+        self.delete(&format!("/api/Roles/{role_id}"), &[]).await
     }
 
     // --- Tags (endpoint name confirmed by a permission-denied response
