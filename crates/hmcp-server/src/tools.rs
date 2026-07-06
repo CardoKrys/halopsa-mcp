@@ -1218,10 +1218,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_item",
-            "description": "Create a new catalogue item. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a new catalogue item. Confirmed against the live sandbox and the Halo API docs (/apidoc/resources/items): requires assetgroup_id (an Item Group's ID, from create_item_group/list_item_groups — despite the name, it is not an Asset Group), and the price field is baseprice, not unit_price.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "Item fields, e.g. { \"name\": \"USB-C Hub\", \"unit_price\": 49.99 }" } },
+                "properties": { "fields": { "type": "object", "description": "Item fields, e.g. { \"name\": \"USB-C Hub\", \"assetgroup_id\": 27, \"baseprice\": 49.99 }. assetgroup_id is required (HaloPSA returns 'Item group must be completed' without it)." } },
                 "required": ["fields"]
             }
         }),
