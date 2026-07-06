@@ -1407,10 +1407,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_asset_group",
-            "description": "Create a new asset group. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a new asset group. Confirmed against the live sandbox: HaloPSA rejects the request with 'Please pick use for this group' unless at least one of showasequip/showasitem is set true — it is not a \"use\" field despite the error text.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "Group fields, e.g. { \"name\": \"Server Room A\" }" } },
+                "properties": { "fields": { "type": "object", "description": "Group fields, e.g. { \"name\": \"Server Room A\", \"showasequip\": true }. Set showasequip and/or showasitem true depending on whether the group is for assets, items, or both." } },
                 "required": ["fields"]
             }
         }),
@@ -3584,7 +3584,16 @@ async fn exec_update_client(args: &Value, client: &HaloPSAClient) -> Result<Stri
 }
 
 async fn exec_list_asset_types(client: &HaloPSAClient) -> Result<String, String> {
-    let types = client.list_asset_types().await?;
+    let mut types = client.list_asset_types().await?;
+    // Each asset type embeds its full custom-field schema (every field
+    // definition for every asset of that type) under `fields` — observed
+    // ~119KB/4300 lines for ~26 types. Nothing reads it; only id/name/
+    // assetgroup metadata is needed to pick an assettype_id for create_asset.
+    for t in types.iter_mut() {
+        if let Some(obj) = t.as_object_mut() {
+            obj.remove("fields");
+        }
+    }
     Ok(serde_json::to_string_pretty(&json!({ "asset_types": types })).unwrap())
 }
 
@@ -4162,7 +4171,12 @@ async fn exec_get_asset(args: &Value, client: &HaloPSAClient) -> Result<String, 
         .and_then(|v| v.as_i64())
         .ok_or("asset_id is required")?;
 
-    let result = client.get_asset(asset_id).await?;
+    let mut result = client.get_asset(asset_id).await?;
+    // Same field-schema bloat pattern as list_asset_types/tickets — a
+    // single asset embeds its full type's field-schema under `fields`.
+    if let Some(obj) = result.as_object_mut() {
+        obj.remove("fields");
+    }
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
