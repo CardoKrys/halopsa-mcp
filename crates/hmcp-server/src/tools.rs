@@ -2379,6 +2379,18 @@ fn redact_secrets(value: &mut Value) {
     }
 }
 
+/// A single ticket fetched/created/updated with `includedetails=true`
+/// embeds the full workflow-action field schema (every field, dropdown
+/// value, and validation rule for every action available on the ticket's
+/// type) under `extra_actions` — observed: ~94KB / 3200 lines for one
+/// freshly created ticket, almost entirely schema noise. Nothing in this
+/// codebase reads `extra_actions`, so drop it before returning.
+fn strip_ticket_bloat(value: &mut Value) {
+    if let Some(obj) = value.as_object_mut() {
+        obj.remove("extra_actions");
+    }
+}
+
 fn summarize_tickets(tickets: &[Value]) -> Vec<Value> {
     tickets
         .iter()
@@ -2570,6 +2582,7 @@ async fn exec_get_ticket(args: &Value, client: &HaloPSAClient) -> Result<String,
     }).collect();
 
     let mut result = ticket;
+    strip_ticket_bloat(&mut result);
     if let Some(obj) = result.as_object_mut() {
         obj.insert("_available_workflow_actions".into(), json!(action_names));
     }
@@ -2610,7 +2623,8 @@ async fn exec_create_ticket(args: &Value, client: &HaloPSAClient) -> Result<Stri
         }
     }
 
-    let result = client.create_ticket(ticket).await?;
+    let mut result = client.create_ticket(ticket).await?;
+    strip_ticket_bloat(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -2637,7 +2651,8 @@ async fn exec_update_ticket(args: &Value, client: &HaloPSAClient) -> Result<Stri
         }
     }
 
-    let result = client.update_ticket(ticket_id, fields).await?;
+    let mut result = client.update_ticket(ticket_id, fields).await?;
+    strip_ticket_bloat(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
