@@ -237,7 +237,12 @@ impl HaloPSAClient {
             action["workflow_subdetail_id"] = json!(wf_id);
         }
         if let Some(sid) = status_id {
-            action["status_id"] = json!(sid);
+            // Confirmed against the live Halo API docs (/apidoc/resources/
+            // actions): the Action entity's status-transition field is
+            // `new_status`, not `status_id` — the latter is silently
+            // ignored (old_status/new_status both echo the ticket's
+            // unchanged status in the response).
+            action["new_status"] = json!(sid);
         }
         self.post("/api/Actions", &json!([action])).await
     }
