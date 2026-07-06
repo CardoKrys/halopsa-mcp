@@ -1620,7 +1620,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_crm_note",
-            "description": "Create a CRM note against a client or supplier. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a CRM note against a client or supplier. Confirmed against the live sandbox.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1698,11 +1698,11 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_custom_table",
-            "description": "Create a new custom data table. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a new custom data table. Confirmed against the live sandbox: `name` becomes a real backing database table name (prefixed CT), so it must be alphanumeric with no spaces or special characters — HaloPSA rejects e.g. \"Vendor Certifications\" with 400 'Invalid Name' but accepts \"VendorCertifications\".",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "fields": { "type": "object", "description": "Table fields, e.g. { \"name\": \"Vendor Certifications\" }" }
+                    "fields": { "type": "object", "description": "Table fields, e.g. { \"name\": \"VendorCertifications\" }. name must be alphanumeric only (no spaces/punctuation)." }
                 },
                 "required": ["fields"]
             }
