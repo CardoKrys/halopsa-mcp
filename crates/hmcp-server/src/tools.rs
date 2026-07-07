@@ -1551,7 +1551,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_report_pdf",
-            "description": "Generate a PDF from a saved report. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Confirmed NOT to work as described: the `ispdf`/`dontloadsystemreport` query params this sends aren't real HaloPSA parameters (absent from the official API docs) and are silently ignored — this just returns the same report JSON as fetching the report normally (with loadreport=true), never a PDF. No real PDF-export endpoint has been found for reports. Prefer run_report for report data; treat any PDF/file expectation from this tool as unmet.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
