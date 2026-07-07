@@ -380,12 +380,12 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_billing_lines",
-            "description": "List individual billing line items (flattened from invoices). Returns paginated results. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "List individual billing line items (flattened from invoices). Confirmed against the live sandbox: page_size caps the number of INVOICES sampled, not the number of lines returned — an invoice with multiple lines can push the result past page_size, since all of its lines are included together.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
                     "page": { "type": "integer", "description": "Page number (default 1)", "default": 1 },
-                    "page_size": { "type": "integer", "description": "Results per page (1-100, default 50)", "default": 50 }
+                    "page_size": { "type": "integer", "description": "Max invoices to sample lines from, not max lines returned (1-100, default 50)", "default": 50 }
                 }
             }
         }),
@@ -722,7 +722,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "send_notification_message",
-            "description": "Send a direct notification message to an agent. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Send a direct notification message to an agent. Confirmed BROKEN against the live sandbox: /api/NotificationMessage fails at the connection level (not a clean 404) — this is not a real endpoint. No verified alternative found; treat as non-functional until a real endpoint is found via live capture.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "fields": { "type": "object", "description": "e.g. { \"message\": \"Please review ticket #5678\", \"agent_id\": 12 }" } },
@@ -766,10 +766,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_service_status",
-            "description": "Record a new service status entry (operational, degraded, outage). Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Record a new service status entry. Confirmed against the live sandbox: `status` must be an integer code, not a string — HaloPSA 400s with \"Could not convert string to integer\" otherwise. `1` is a confirmed real value (seen on an existing OK/no-failure status); the rest of the enum (e.g. an outage code) is not yet confirmed.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "e.g. { \"service_id\": 1, \"status\": \"degraded\" }" } },
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"service_id\": 1, \"status\": 1 }" } },
                 "required": ["fields"]
             }
         }),
@@ -885,15 +885,20 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_integration_configs",
-            "description": "List all configured third-party integrations with their connection status. Endpoint path unconfirmed against this sandbox (real field shape confirmed via StackJack reference).",
-            "inputSchema": { "type": "object", "properties": {} }
+            "description": "List all configured third-party integrations with their connection status. Confirmed against the live sandbox: backed by /api/features, which has no server-side pagination and returns every feature in the whole product — truncated client-side to page_size to avoid an oversized response.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "page_size": { "type": "integer", "description": "Max records to return (default 50)", "default": 50 }
+                }
+            }
         }),
         json!({
             "name": "get_integration_config",
-            "description": "Get full details of a single integration config by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Get full details of a single integration config by ID. Confirmed against the live sandbox: this is the same /api/features resource used by list_integration_configs — the previously assumed /api/Integration endpoint 404s even for real IDs.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "config_id": { "type": "integer", "description": "The integration config ID" } },
+                "properties": { "config_id": { "type": "integer", "description": "The integration config ID (the `id` field from list_integration_configs)" } },
                 "required": ["config_id"]
             }
         }),
@@ -1076,7 +1081,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "list_roles",
-            "description": "List access-control roles. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "List access-control roles. Confirmed working against the live sandbox, including pagination — but total_count is unreliable (HaloPSA always reports 0 on this endpoint regardless of how many roles exist); don't rely on it.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1087,10 +1092,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "get_role",
-            "description": "Get full details of a single role by ID. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Get full details of a single role by ID. Confirmed against the live sandbox: roles are keyed by the GUID `id` from list_roles, not the numeric `id_int` shown alongside it — passing id_int 404s.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "role_id": { "type": "integer", "description": "The role ID" } },
+                "properties": { "role_id": { "type": "string", "description": "The role's GUID id (from list_roles' `id` field, NOT `id_int`)" } },
                 "required": ["role_id"]
             }
         }),
@@ -1105,11 +1110,11 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "update_role",
-            "description": "Update an existing role's fields. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Update an existing role's fields. Confirmed against the live sandbox: roles are keyed by the GUID `id` from list_roles, not the numeric `id_int` — passing id_int here previously caused HaloPSA to silently create a brand-new duplicate role instead of updating.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "role_id": { "type": "integer", "description": "The role ID" },
+                    "role_id": { "type": "string", "description": "The role's GUID id (from list_roles' `id` field, NOT `id_int`)" },
                     "fields": { "type": "object", "description": "Fields to update" }
                 },
                 "required": ["role_id", "fields"]
@@ -1117,10 +1122,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "delete_role",
-            "description": "Delete a role by ID. WARNING: permanently removes it; agents assigned this role may lose permissions. Endpoint unconfirmed against this sandbox.",
+            "description": "Delete a role by ID. WARNING: permanently removes it; agents assigned this role may lose permissions. Confirmed against the live sandbox: roles are keyed by the GUID `id` from list_roles, not the numeric `id_int`.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "role_id": { "type": "integer", "description": "The role ID" } },
+                "properties": { "role_id": { "type": "string", "description": "The role's GUID id (from list_roles' `id` field, NOT `id_int`)" } },
                 "required": ["role_id"]
             }
         }),
@@ -2219,7 +2224,7 @@ pub async fn execute_tool(
         "register_kb_article_view" => exec_register_kb_article_view(args, client).await,
         "review_expense" => exec_review_expense(args, client).await,
         "expire_client_prepay" => exec_expire_client_prepay(args, client).await,
-        "list_integration_configs" => exec_list_integration_configs(client).await,
+        "list_integration_configs" => exec_list_integration_configs(args, client).await,
         "get_integration_config" => exec_get_integration_config(args, client).await,
         "list_integration_site_mappings" => exec_list_integration_site_mappings(args, client).await,
         "list_integration_errors" => exec_list_integration_errors(args, client).await,
@@ -3208,8 +3213,9 @@ async fn exec_expire_client_prepay(args: &Value, client: &HaloPSAClient) -> Resu
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
-async fn exec_list_integration_configs(client: &HaloPSAClient) -> Result<String, String> {
-    let configs = client.list_integration_configs().await?;
+async fn exec_list_integration_configs(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let page_size = args.get("page_size").and_then(|v| v.as_i64()).unwrap_or(50);
+    let configs = client.list_integration_configs(page_size).await?;
     Ok(serde_json::to_string_pretty(&json!({ "integration_configs": configs })).unwrap())
 }
 
@@ -3344,7 +3350,7 @@ async fn exec_list_roles(args: &Value, client: &HaloPSAClient) -> Result<String,
 }
 
 async fn exec_get_role(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let role_id = args.get("role_id").and_then(|v| v.as_i64()).ok_or("role_id is required")?;
+    let role_id = args.get("role_id").and_then(|v| v.as_str()).ok_or("role_id is required")?;
     let result = client.get_role(role_id).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -3356,14 +3362,14 @@ async fn exec_create_role(args: &Value, client: &HaloPSAClient) -> Result<String
 }
 
 async fn exec_update_role(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let role_id = args.get("role_id").and_then(|v| v.as_i64()).ok_or("role_id is required")?;
+    let role_id = args.get("role_id").and_then(|v| v.as_str()).ok_or("role_id is required")?;
     let fields = args.get("fields").cloned().unwrap_or(json!({}));
     let result = client.update_role(role_id, fields).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_delete_role(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
-    let role_id = args.get("role_id").and_then(|v| v.as_i64()).ok_or("role_id is required")?;
+    let role_id = args.get("role_id").and_then(|v| v.as_str()).ok_or("role_id is required")?;
     client.delete_role(role_id).await?;
     Ok(serde_json::to_string_pretty(&json!({ "deleted": true, "role_id": role_id })).unwrap())
 }

@@ -1120,6 +1120,13 @@ impl HaloPSAClient {
         self.post("/api/Notification", &json!([notification])).await
     }
 
+    /// Confirmed BROKEN against the live sandbox: /api/NotificationMessage
+    /// is not a real endpoint (the request fails at the connection level,
+    /// the same signature as other entirely-wrong guessed paths, not a
+    /// clean 404). No verified alternative found yet — HaloPSA's ad-hoc
+    /// agent notifications may not be exposed as a public REST write at
+    /// all. Needs live browser capture to find a real endpoint, if one
+    /// exists, before this can work.
     pub async fn send_notification_message(&self, message: Value) -> Result<Value, String> {
         self.post("/api/NotificationMessage", &json!([message])).await
     }
@@ -1173,6 +1180,11 @@ impl HaloPSAClient {
         Ok(parse_halo_list::<Value>(value))
     }
 
+    /// Confirmed against the live sandbox: `status` is an integer code, not
+    /// a string like "operational"/"degraded" — HaloPSA 400s with "Could not
+    /// convert string to integer" otherwise. Confirmed real value: `1` (seen
+    /// on an existing OK/no-failure status record via list_service_statuses).
+    /// The rest of the enum (e.g. an outage code) is not yet confirmed.
     pub async fn create_service_status(&self, status: Value) -> Result<Value, String> {
         self.post("/api/ServiceStatus", &json!([status])).await
     }
@@ -1259,16 +1271,26 @@ impl HaloPSAClient {
     /// there is no dedicated /api/Integration* list endpoint — the same
     /// gallery of integrations (and every other config feature) is driven
     /// by /api/features, which reports each feature's enabled state.
-    pub async fn list_integration_configs(&self) -> Result<Vec<Value>, String> {
+    /// /api/features has no server-side pagination — it returns every
+    /// feature in the whole product (hundreds of small records), which
+    /// blows past the tool output limit. Truncate client-side like the
+    /// other endpoints that ignore page_size.
+    pub async fn list_integration_configs(&self, page_size: i64) -> Result<Vec<Value>, String> {
         let value = self
             .get_raw("/api/features", &[("showenabled", "true".into()), ("showdisabled", "true".into()), ("isconfig", "true".into())])
             .await?;
-        Ok(parse_halo_list::<Value>(value))
+        let mut records = parse_halo_list::<Value>(value);
+        records.truncate(page_size.max(1) as usize);
+        Ok(records)
     }
 
+    /// Confirmed against the live sandbox: there's no dedicated /api/Integration
+    /// resource (the previous path 404s even for a real, existing config ID).
+    /// Since list_integration_configs is actually backed by /api/features,
+    /// fetch the single feature from the same resource instead.
     pub async fn get_integration_config(&self, config_id: i64) -> Result<Value, String> {
         self.get_raw(
-            &format!("/api/Integration/{config_id}"),
+            &format!("/api/features/{config_id}"),
             &[("includedetails", "true".into())],
         )
         .await
@@ -1457,6 +1479,13 @@ impl HaloPSAClient {
 
     /// Confirmed via sandbox capture (Config > Teams & Agents > Roles):
     /// /api/Roles (plural), with access_control_level + isconfig.
+    /// Confirmed against the live sandbox: page_size/pageinate work
+    /// correctly here (unlike most other list_* endpoints), but
+    /// record_count always comes back 0 regardless of how many roles
+    /// actually exist — a genuine HaloPSA-side quirk on this endpoint,
+    /// not something client-side truncation can paper over (since the
+    /// server already returns only one page's worth of records, there's
+    /// no larger array to count). Treat record_count as unreliable here.
     pub async fn list_roles(&self, page: i64, page_size: i64) -> Result<(Vec<Value>, i64), String> {
         let params: Vec<(&str, String)> = vec![
             ("pageinate", "true".into()),
@@ -1472,9 +1501,11 @@ impl HaloPSAClient {
         Ok((records, record_count))
     }
 
-    /// Single-item path inferred from the confirmed /api/Roles list
-    /// endpoint (not independently captured) — retest if it 404s.
-    pub async fn get_role(&self, role_id: i64) -> Result<Value, String> {
+    /// Confirmed against the live sandbox: Roles are keyed by a GUID `id`,
+    /// not the `id_int` shown alongside it in list_roles. Passing id_int
+    /// here 404s on GET and, on POST (update), gets silently treated as a
+    /// brand-new record instead of matching the existing one.
+    pub async fn get_role(&self, role_id: &str) -> Result<Value, String> {
         self.get_raw(&format!("/api/Roles/{role_id}"), &[("includedetails", "true".into())]).await
     }
 
@@ -1482,14 +1513,14 @@ impl HaloPSAClient {
         self.post("/api/Roles", &json!([role])).await
     }
 
-    pub async fn update_role(&self, role_id: i64, mut fields: Value) -> Result<Value, String> {
+    pub async fn update_role(&self, role_id: &str, mut fields: Value) -> Result<Value, String> {
         if let Some(obj) = fields.as_object_mut() {
             obj.insert("id".into(), json!(role_id));
         }
         self.post("/api/Roles", &json!([fields])).await
     }
 
-    pub async fn delete_role(&self, role_id: i64) -> Result<(), String> {
+    pub async fn delete_role(&self, role_id: &str) -> Result<(), String> {
         self.delete(&format!("/api/Roles/{role_id}"), &[]).await
     }
 
