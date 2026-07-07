@@ -1586,11 +1586,11 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_opportunity",
-            "description": "Create a new CRM opportunity/deal. Body shape unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a new CRM opportunity/deal. Confirmed against the live sandbox: `targetdate` is required or HaloPSA rejects with 400 'Target Date is mandatory'.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
-                    "fields": { "type": "object", "description": "Opportunity fields, e.g. { \"summary\": \"Managed Services Contract\", \"client_id\": 1, \"oppvalueadjusted\": 24000 }" }
+                    "fields": { "type": "object", "description": "Opportunity fields, e.g. { \"summary\": \"Managed Services Contract\", \"client_id\": 1, \"oppvalueadjusted\": 24000, \"targetdate\": \"2026-12-31T00:00:00Z\" }. targetdate is required." }
                 },
                 "required": ["fields"]
             }
@@ -3624,14 +3624,16 @@ async fn exec_list_projects(args: &Value, client: &HaloPSAClient) -> Result<Stri
 async fn exec_get_project(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let project_id = args.get("project_id").and_then(|v| v.as_i64()).ok_or("project_id is required")?;
 
-    let result = client.get_project(project_id).await?;
+    let mut result = client.get_project(project_id).await?;
+    strip_ticket_bloat(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_create_project(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let fields = args.get("fields").cloned().ok_or("fields is required")?;
 
-    let result = client.create_project(fields).await?;
+    let mut result = client.create_project(fields).await?;
+    strip_ticket_bloat(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3639,7 +3641,8 @@ async fn exec_update_project(args: &Value, client: &HaloPSAClient) -> Result<Str
     let project_id = args.get("project_id").and_then(|v| v.as_i64()).ok_or("project_id is required")?;
     let fields = args.get("fields").cloned().unwrap_or(json!({}));
 
-    let result = client.update_project(project_id, fields).await?;
+    let mut result = client.update_project(project_id, fields).await?;
+    strip_ticket_bloat(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3693,14 +3696,16 @@ async fn exec_get_opportunity(args: &Value, client: &HaloPSAClient) -> Result<St
         .and_then(|v| v.as_i64())
         .ok_or("opportunity_id is required")?;
 
-    let result = client.get_opportunity(opportunity_id).await?;
+    let mut result = client.get_opportunity(opportunity_id).await?;
+    strip_ticket_bloat(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_create_opportunity(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let fields = args.get("fields").cloned().ok_or("fields is required")?;
 
-    let result = client.create_opportunity(fields).await?;
+    let mut result = client.create_opportunity(fields).await?;
+    strip_ticket_bloat(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
@@ -3711,7 +3716,8 @@ async fn exec_update_opportunity(args: &Value, client: &HaloPSAClient) -> Result
         .ok_or("opportunity_id is required")?;
     let fields = args.get("fields").cloned().unwrap_or(json!({}));
 
-    let result = client.update_opportunity(opportunity_id, fields).await?;
+    let mut result = client.update_opportunity(opportunity_id, fields).await?;
+    strip_ticket_bloat(&mut result);
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
