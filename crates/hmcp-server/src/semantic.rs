@@ -180,7 +180,7 @@ impl SemanticState {
                     "heading": detail.map(|d| d.heading_path.as_str()).unwrap_or(""),
                     "excerpt": detail.map(|d| {
                         if d.content.len() > 500 {
-                            format!("{}...", &d.content[..500])
+                            format!("{}...", hmcp_common::util::truncate_str(&d.content, 500))
                         } else {
                             d.content.clone()
                         }

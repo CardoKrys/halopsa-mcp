@@ -3,7 +3,7 @@ services:
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ${HMCP_DB_USER:-hmcp}
-      POSTGRES_PASSWORD: ${HMCP_DB_PASSWORD:-hmcp}
+      POSTGRES_PASSWORD: ${HMCP_DB_PASSWORD:?HMCP_DB_PASSWORD must be set in .env}
       POSTGRES_DB: ${HMCP_DB_NAME:-hmcp}
     volumes:
       - hmcp-postgres:/var/lib/postgresql/data
@@ -23,7 +23,7 @@ services:
       - "8080"
     env_file: .env
     environment:
-      HMCP_DATABASE_URL: postgres://${HMCP_DB_USER:-hmcp}:${HMCP_DB_PASSWORD:-hmcp}@postgres:5432/${HMCP_DB_NAME:-hmcp}
+      HMCP_DATABASE_URL: postgres://${HMCP_DB_USER:-hmcp}:${HMCP_DB_PASSWORD:?HMCP_DB_PASSWORD must be set in .env}@postgres:5432/${HMCP_DB_NAME:-hmcp}
     depends_on:
       postgres:
         condition: service_healthy

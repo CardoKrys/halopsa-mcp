@@ -291,7 +291,7 @@ pub async fn handle_callback(
 
     if !token_resp.status().is_success() {
         let body = token_resp.text().await.unwrap_or_default();
-        let preview = if body.len() > 500 { &body[..500] } else { &body };
+        let preview = hmcp_common::util::truncate_str(&body, 500);
         eprintln!("HaloPSA token exchange error: {preview}");
         return (
             StatusCode::BAD_GATEWAY,
@@ -366,6 +366,10 @@ pub async fn handle_token(
     State(state): State<AppState>,
     axum::Form(mut form): axum::Form<TokenForm>,
 ) -> impl IntoResponse {
+    if state.token_rate_limit.lock().await.check().is_err() {
+        return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": "rate_limited"}))).into_response();
+    }
+
     match form.grant_type.as_str() {
         "authorization_code" => handle_authorization_code_grant(state, &mut form).await,
         "refresh_token" => handle_refresh_token_grant(state, &mut form).await,
@@ -405,6 +409,20 @@ async fn handle_authorization_code_grant(
         )
             .into_response();
     };
+
+    // RFC 6749 6.1.3: if redirect_uri was present at /authorize, it must be
+    // repeated here and must match exactly. PKCE (verified below) already
+    // closes the main attack this guards against, but this is cheap and
+    // keeps the flow spec-compliant.
+    if let Some(ref form_redirect) = form.redirect_uri {
+        if form_redirect != &auth_code.redirect_uri {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "invalid_grant", "error_description": "redirect_uri does not match the authorization request"})),
+            )
+                .into_response();
+        }
+    }
 
     // Verify PKCE
     if let Some(ref challenge) = auth_code.code_challenge {

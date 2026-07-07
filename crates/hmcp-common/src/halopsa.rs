@@ -1537,6 +1537,9 @@ impl HaloPSAClient {
     /// here 404s on GET and, on POST (update), gets silently treated as a
     /// brand-new record instead of matching the existing one.
     pub async fn get_role(&self, role_id: &str) -> Result<Value, String> {
+        if !crate::util::is_guid(role_id) {
+            return Err("role_id must be a GUID (see the id field from list_roles, not id_int)".into());
+        }
         self.get_raw(&format!("/api/Roles/{role_id}"), &[("includedetails", "true".into())]).await
     }
 
@@ -1545,6 +1548,9 @@ impl HaloPSAClient {
     }
 
     pub async fn update_role(&self, role_id: &str, mut fields: Value) -> Result<Value, String> {
+        if !crate::util::is_guid(role_id) {
+            return Err("role_id must be a GUID (see the id field from list_roles, not id_int)".into());
+        }
         if let Some(obj) = fields.as_object_mut() {
             obj.insert("id".into(), json!(role_id));
         }
@@ -1552,6 +1558,9 @@ impl HaloPSAClient {
     }
 
     pub async fn delete_role(&self, role_id: &str) -> Result<(), String> {
+        if !crate::util::is_guid(role_id) {
+            return Err("role_id must be a GUID (see the id field from list_roles, not id_int)".into());
+        }
         self.delete(&format!("/api/Roles/{role_id}"), &[]).await
     }
 
@@ -2351,7 +2360,7 @@ impl HaloPSAClient {
             .map_err(|e| format!("Failed to read response: {e}"))?;
 
         if !status.is_success() {
-            let preview = if body.len() > 500 { &body[..500] } else { &body };
+            let preview = crate::util::truncate_str(&body, 500);
             return Err(format!("HaloPSA API error {status}: {preview}"));
         }
 
@@ -2379,7 +2388,7 @@ impl HaloPSAClient {
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            let preview = if body.len() > 500 { &body[..500] } else { &body };
+            let preview = crate::util::truncate_str(&body, 500);
             return Err(format!("HaloPSA API error {status}: {preview}"));
         }
 
@@ -2406,11 +2415,7 @@ impl HaloPSAClient {
             .map_err(|e| format!("Failed to read response: {e}"))?;
 
         if !status.is_success() {
-            let preview = if body_text.len() > 500 {
-                &body_text[..500]
-            } else {
-                &body_text
-            };
+            let preview = crate::util::truncate_str(&body_text, 500);
             return Err(format!("HaloPSA API error {status}: {preview}"));
         }
 

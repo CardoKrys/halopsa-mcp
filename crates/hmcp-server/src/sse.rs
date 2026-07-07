@@ -48,6 +48,7 @@ pub struct AppState {
     pub known_urls: Vec<String>,
     pub authorize_rate_limit: Arc<Mutex<RateLimit>>,
     pub register_rate_limit: Arc<Mutex<RateLimit>>,
+    pub token_rate_limit: Arc<Mutex<RateLimit>>,
     streamable_sessions: Arc<RwLock<HashMap<String, Instant>>>,
     pub semantic: Option<Arc<SemanticState>>,
 }
@@ -123,6 +124,9 @@ impl AppState {
             known_urls,
             authorize_rate_limit: Arc::new(Mutex::new(RateLimit::new(20))),
             register_rate_limit: Arc::new(Mutex::new(RateLimit::new(10))),
+            // Higher ceiling than /authorize — legitimate refresh-token
+            // churn across many active sessions passes through here too.
+            token_rate_limit: Arc::new(Mutex::new(RateLimit::new(60))),
             streamable_sessions: Arc::new(RwLock::new(HashMap::new())),
             semantic,
         }
