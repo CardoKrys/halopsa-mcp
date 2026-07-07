@@ -485,10 +485,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_sales_order",
-            "description": "Create a new sales order. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a new sales order. Confirmed against the live sandbox: user_id (a valid contact on the client) is required or HaloPSA rejects with 400 'Please select a valid User'.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "e.g. { \"client_id\": 1, \"lines\": [...] }" } },
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"client_id\": 1, \"user_id\": 42, \"lines\": [...] }. user_id is required." } },
                 "required": ["fields"]
             }
         }),
@@ -789,10 +789,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_invoice_status",
-            "description": "Create a new invoice status. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a new invoice status. Confirmed against the live sandbox: the name field is status_name (not name), and type (an int stage enum: 0=Draft-like, 1=Awaiting Approval, 2=Approved, 3=Posted, 4=Sent, 5=Paid, 6=Voided, 7=Closed) is required — omitting it triggers a raw SQL NOT NULL error from HaloPSA (500-shaped 400: \"Cannot insert the value NULL into column 'ISType'\").",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "e.g. { \"name\": \"Awaiting Payment\" }" } },
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"status_name\": \"Awaiting Payment\", \"type\": 1 }. Both fields are required." } },
                 "required": ["fields"]
             }
         }),
