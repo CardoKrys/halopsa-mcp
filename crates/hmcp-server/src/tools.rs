@@ -671,7 +671,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "update_workflow",
-            "description": "Update an existing workflow's fields. Endpoint unconfirmed against this sandbox for writes — flag results as unverified.",
+            "description": "Update an existing workflow's fields. Confirmed limitation: HaloPSA validates the whole workflow structure on every update (not just the changed fields) and rejects with 400 'Please select a Start Step for this Workflow' unless a fully valid start step/stages/steps structure is present — a simple field-only partial update (even re-sending the existing stages array) is not enough. Fetch the full structure with get_workflow first if editing an existing workflow's stages/steps.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -3298,7 +3298,10 @@ async fn exec_create_asset(args: &Value, client: &HaloPSAClient) -> Result<Strin
 async fn exec_update_asset(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
     let asset_id = args.get("asset_id").and_then(|v| v.as_i64()).ok_or("asset_id is required")?;
     let fields = args.get("fields").cloned().unwrap_or(json!({}));
-    let result = client.update_asset(asset_id, fields).await?;
+    let mut result = client.update_asset(asset_id, fields).await?;
+    if let Some(obj) = result.as_object_mut() {
+        obj.remove("fields");
+    }
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
