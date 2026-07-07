@@ -721,8 +721,21 @@ pub fn tool_definitions() -> Vec<Value> {
             }
         }),
         json!({
+            "name": "list_notification_feed",
+            "description": "List the authenticated agent's own notification feed (the popup/bell inbox of real notification events) — NOT the same as list_notifications, which lists notification RULE definitions. Confirmed via a real browser Network-tab capture against production Halo. `mark_as_shown` defaults to false since setting it true has a real side effect: it marks those notifications as read in the actual agent's UI.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "count": { "type": "integer", "description": "Max notifications to return (default 50, capped at 200)", "default": 50 },
+                    "newer_than_id": { "type": "integer", "description": "Only return notifications newer than this ID (for incremental polling)" },
+                    "mark_as_shown": { "type": "boolean", "description": "Mark returned notifications as read/shown in the agent's UI (default false — side-effecting, opt in explicitly)", "default": false },
+                    "convert_to_plain": { "type": "boolean", "description": "Convert notification body HTML to plain text (default true)", "default": true }
+                }
+            }
+        }),
+        json!({
             "name": "send_notification_message",
-            "description": "Send a direct notification message to an agent. Confirmed BROKEN against the live sandbox: /api/NotificationMessage fails at the connection level (not a clean 404) — this is not a real endpoint. No verified alternative found; treat as non-functional until a real endpoint is found via live capture.",
+            "description": "Send a direct notification message to an agent. Confirmed BROKEN against the live sandbox: /api/NotificationMessage fails at the connection level (not a clean 404) — this is not a real endpoint. A real capture of the Notifications feature (see list_notification_feed) turned out to be a GET-based feed, not a send-to-agent write — no evidence a send endpoint exists in the public API. Treat as non-functional.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "fields": { "type": "object", "description": "e.g. { \"message\": \"Please review ticket #5678\", \"agent_id\": 12 }" } },
@@ -2207,6 +2220,7 @@ pub async fn execute_tool(
         "get_notification" => exec_get_notification(args, client).await,
         "create_notification" => exec_create_notification(args, client).await,
         "send_notification_message" => exec_send_notification_message(args, client).await,
+        "list_notification_feed" => exec_list_notification_feed(args, client).await,
         "list_services" => exec_list_services(args, client).await,
         "get_service" => exec_get_service(args, client).await,
         "list_service_categories" => exec_list_service_categories(client).await,
@@ -3094,6 +3108,17 @@ async fn exec_send_notification_message(args: &Value, client: &HaloPSAClient) ->
     let fields = args.get("fields").cloned().ok_or("fields is required")?;
     let result = client.send_notification_message(fields).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
+}
+
+async fn exec_list_notification_feed(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let count = args.get("count").and_then(|v| v.as_i64()).unwrap_or(50);
+    let newer_than_id = args.get("newer_than_id").and_then(|v| v.as_i64());
+    let mark_as_shown = args.get("mark_as_shown").and_then(|v| v.as_bool()).unwrap_or(false);
+    let convert_to_plain = args.get("convert_to_plain").and_then(|v| v.as_bool()).unwrap_or(true);
+    let notifications = client
+        .list_notification_feed(count, newer_than_id, mark_as_shown, convert_to_plain)
+        .await?;
+    Ok(serde_json::to_string_pretty(&json!({ "notifications": notifications })).unwrap())
 }
 
 async fn exec_list_services(args: &Value, client: &HaloPSAClient) -> Result<String, String> {

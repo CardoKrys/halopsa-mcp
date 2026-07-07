@@ -1120,13 +1120,44 @@ impl HaloPSAClient {
         self.post("/api/Notification", &json!([notification])).await
     }
 
+    /// Confirmed via a real browser Network-tab capture against live
+    /// production Halo: the authenticated agent's own notification feed
+    /// (the popup/bell inbox, NOT the notification-rule config resource
+    /// above — /api/Notification singular vs /api/Notifications plural
+    /// are two different resources) is `GET /api/Notifications`. Dropped
+    /// the captured `clientversion`/`checkhalointegrator`/`utc_offset`
+    /// params — they look like web-client fingerprinting/display-only
+    /// concerns, not filters that change what data comes back.
+    /// `mark_as_shown` defaults to false since it has a real side effect
+    /// (marks notifications as read in the actual agent's UI) — don't
+    /// flip it on by default just to read the feed.
+    pub async fn list_notification_feed(
+        &self,
+        count: i64,
+        newer_than_id: Option<i64>,
+        mark_as_shown: bool,
+        convert_to_plain: bool,
+    ) -> Result<Vec<Value>, String> {
+        let mut params: Vec<(&str, String)> = vec![
+            ("count", count.max(1).min(200).to_string()),
+            ("_convert_to_plain", convert_to_plain.to_string()),
+            ("update_shown", mark_as_shown.to_string()),
+        ];
+        if let Some(id) = newer_than_id {
+            params.push(("newer_than_id", id.to_string()));
+        }
+        let value = self.get_raw("/api/Notifications", &params).await?;
+        Ok(parse_halo_list::<Value>(value))
+    }
+
     /// Confirmed BROKEN against the live sandbox: /api/NotificationMessage
     /// is not a real endpoint (the request fails at the connection level,
     /// the same signature as other entirely-wrong guessed paths, not a
-    /// clean 404). No verified alternative found yet — HaloPSA's ad-hoc
-    /// agent notifications may not be exposed as a public REST write at
-    /// all. Needs live browser capture to find a real endpoint, if one
-    /// exists, before this can work.
+    /// clean 404). A real capture of the Notifications feature turned out
+    /// to be the GET-based feed above (list_notification_feed), not a
+    /// send-to-agent write — no evidence a "send an ad-hoc message to an
+    /// agent" write endpoint exists in the public API at all. Left
+    /// unimplemented pending further evidence either way.
     pub async fn send_notification_message(&self, message: Value) -> Result<Value, String> {
         self.post("/api/NotificationMessage", &json!([message])).await
     }
