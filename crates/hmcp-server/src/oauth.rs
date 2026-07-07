@@ -41,6 +41,15 @@ impl Drop for AuthCode {
     }
 }
 
+/// A client that has completed dynamic registration (POST /register).
+/// /authorize validates its redirect_uri against this record — without it,
+/// any caller could redirect a completed OAuth flow (carrying a real
+/// HaloPSA-backed access token) to an arbitrary attacker-controlled URL.
+pub struct RegisteredClient {
+    pub redirect_uris: Vec<String>,
+    pub created_at: Instant,
+}
+
 /// Pending OAuth authorization: tracks state between /authorize → HaloPSA → /callback.
 pub struct PendingAuth {
     pub mcp_code_challenge: Option<String>,
@@ -142,6 +151,40 @@ pub async fn handle_authorize(
             Json(json!({"error": "unsupported_response_type"})),
         )
             .into_response();
+    }
+
+    // OAuth 2.1 requires PKCE on every authorization-code flow. Without
+    // this, a crafted /authorize link with no code_challenge lets an
+    // attacker skip PKCE verification entirely at /token.
+    if params.code_challenge.is_none() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid_request", "error_description": "code_challenge is required"})),
+        )
+            .into_response();
+    }
+
+    // The redirect_uri must exactly match one registered for this client_id
+    // via POST /register. Without this check, anyone could pass an
+    // arbitrary redirect_uri and have a completed OAuth flow — carrying a
+    // real HaloPSA-backed access token — redirected to an attacker-controlled
+    // URL instead of the legitimate client.
+    {
+        let clients = state.registered_clients.read().await;
+        let Some(client) = clients.get(&params.client_id) else {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "invalid_client", "error_description": "Unknown client_id — call POST /register first"})),
+            )
+                .into_response();
+        };
+        if !client.redirect_uris.iter().any(|u| u == &params.redirect_uri) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "invalid_request", "error_description": "redirect_uri does not match a registered value for this client_id"})),
+            )
+                .into_response();
+        }
     }
 
     let base_url = derive_base_url(&headers, &state.known_urls);
@@ -248,7 +291,8 @@ pub async fn handle_callback(
 
     if !token_resp.status().is_success() {
         let body = token_resp.text().await.unwrap_or_default();
-        eprintln!("HaloPSA token exchange error: {body}");
+        let preview = if body.len() > 500 { &body[..500] } else { &body };
+        eprintln!("HaloPSA token exchange error: {preview}");
         return (
             StatusCode::BAD_GATEWAY,
             Json(json!({"error": "HaloPSA authentication failed"})),
@@ -599,12 +643,44 @@ pub async fn handle_register(
         })
         .unwrap_or_default();
 
+    if redirect_uris.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid_client_metadata", "error_description": "redirect_uris is required"})),
+        )
+            .into_response();
+    }
+    // Reject non-https / non-loopback redirect URIs so a registered client
+    // can't point /authorize's redirect at plaintext http (or something
+    // that isn't a URL at all).
+    for uri in &redirect_uris {
+        let is_https = uri.starts_with("https://");
+        let is_loopback = uri.starts_with("http://localhost")
+            || uri.starts_with("http://127.0.0.1")
+            || uri.starts_with("http://[::1]");
+        if !is_https && !is_loopback {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error": "invalid_redirect_uri", "error_description": "redirect_uris must be https:// (or http://localhost for local development)"})),
+            )
+                .into_response();
+        }
+    }
+
     let client_name = body
         .get("client_name")
         .and_then(|v| v.as_str())
         .unwrap_or("unknown");
 
     let client_id = uuid::Uuid::new_v4().to_string();
+
+    state.registered_clients.write().await.insert(
+        client_id.clone(),
+        RegisteredClient {
+            redirect_uris: redirect_uris.clone(),
+            created_at: Instant::now(),
+        },
+    );
 
     eprintln!("Registered client: {client_name} ({client_id})");
 

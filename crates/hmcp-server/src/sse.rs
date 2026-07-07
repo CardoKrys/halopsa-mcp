@@ -19,13 +19,19 @@ use hmcp_common::db::DbBackend;
 use hmcp_common::halopsa::HaloPSAClient;
 
 use crate::mcp;
-use crate::oauth::{AuthCode, AUTH_CODE_TTL, PendingAuth};
+use crate::oauth::{AuthCode, AUTH_CODE_TTL, PendingAuth, RegisteredClient};
 use crate::semantic::SemanticState;
 
 const MAX_SESSIONS_PER_TOKEN: usize = 5;
 const MAX_TOTAL_SESSIONS: usize = 1000;
 const SESSION_TTL: Duration = Duration::from_secs(24 * 60 * 60);
 const MAX_REQUESTS_PER_MINUTE: u32 = 100;
+// Registered OAuth clients are kept far longer than sessions/auth codes —
+// they represent a long-lived integration (e.g. a Claude connector), not a
+// single login. A restart already wipes this in-memory map and forces every
+// connected client to re-register (standard MCP client behavior on
+// invalid_client), so this TTL is just hygiene against unbounded growth.
+const REGISTERED_CLIENT_TTL: Duration = Duration::from_secs(30 * 24 * 60 * 60);
 
 #[derive(Clone)]
 pub struct AppState {
@@ -37,6 +43,7 @@ pub struct AppState {
     sessions: Arc<RwLock<HashMap<String, Session>>>,
     pub auth_codes: Arc<RwLock<HashMap<String, AuthCode>>>,
     pub pending_auths: Arc<RwLock<HashMap<String, PendingAuth>>>,
+    pub registered_clients: Arc<RwLock<HashMap<String, RegisteredClient>>>,
     pub db: Arc<dyn DbBackend>,
     pub known_urls: Vec<String>,
     pub authorize_rate_limit: Arc<Mutex<RateLimit>>,
@@ -111,6 +118,7 @@ impl AppState {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             auth_codes: Arc::new(RwLock::new(HashMap::new())),
             pending_auths: Arc::new(RwLock::new(HashMap::new())),
+            registered_clients: Arc::new(RwLock::new(HashMap::new())),
             db,
             known_urls,
             authorize_rate_limit: Arc::new(Mutex::new(RateLimit::new(20))),
@@ -124,6 +132,7 @@ impl AppState {
         let sessions = self.sessions.clone();
         let auth_codes = self.auth_codes.clone();
         let pending_auths = self.pending_auths.clone();
+        let registered_clients = self.registered_clients.clone();
         let db = self.db.clone();
         let streamable_sessions = self.streamable_sessions.clone();
 
@@ -147,6 +156,10 @@ impl AppState {
                 {
                     let mut pending = pending_auths.write().await;
                     pending.retain(|_, p| p.created_at.elapsed() < Duration::from_secs(600));
+                }
+                {
+                    let mut clients = registered_clients.write().await;
+                    clients.retain(|_, c| c.created_at.elapsed() < REGISTERED_CLIENT_TTL);
                 }
                 {
                     let mut ss = streamable_sessions.write().await;
