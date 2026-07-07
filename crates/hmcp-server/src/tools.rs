@@ -2394,6 +2394,13 @@ fn redact_secrets(value: &mut Value) {
 fn strip_ticket_bloat(value: &mut Value) {
     if let Some(obj) = value.as_object_mut() {
         obj.remove("extra_actions");
+        // Same schema-noise pattern as extra_actions, just under a
+        // different key — confirmed live post-deploy: with extra_actions
+        // gone, `outcomes` (the full field-schema config for every
+        // possible workflow outcome/action on the ticket's type) became
+        // the dominant bloat (~70% of an 80KB/2800-line get_ticket
+        // response). Unused by any of our code.
+        obj.remove("outcomes");
     }
 }
 
