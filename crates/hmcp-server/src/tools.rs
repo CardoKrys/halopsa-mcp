@@ -2401,6 +2401,15 @@ fn strip_ticket_bloat(value: &mut Value) {
         // the dominant bloat (~70% of an 80KB/2800-line get_ticket
         // response). Unused by any of our code.
         obj.remove("outcomes");
+        // A third instance of the same pattern, confirmed live post-deploy
+        // once the above two were gone: the embedded `tickettype` object
+        // carries its own full field-schema (fields/userfields) — the same
+        // architectural quirk as assets embedding their asset type's
+        // schema (see get_asset/list_asset_types). Strip it the same way.
+        if let Some(tickettype) = obj.get_mut("tickettype").and_then(|v| v.as_object_mut()) {
+            tickettype.remove("fields");
+            tickettype.remove("userfields");
+        }
     }
 }
 
