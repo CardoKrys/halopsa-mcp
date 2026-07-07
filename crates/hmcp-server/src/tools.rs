@@ -807,20 +807,26 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "update_invoice_lines",
-            "description": "Bulk-update invoice line items. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Set/replace line items on an invoice. Confirmed against the live sandbox: lines are set inline on the invoice record itself (posted as { id, lines } to /api/Invoice), not via a separate line-item endpoint — the previously assumed dedicated endpoint returned 404.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "lines": { "type": "array", "description": "Line objects, each including its id and the fields to change", "items": { "type": "object" } } },
-                "required": ["lines"]
+                "properties": {
+                    "invoice_id": { "type": "integer", "description": "The invoice ID" },
+                    "lines": { "type": "array", "description": "Line objects, e.g. { \"item_id\": 7670, \"quantity\": 1, \"price\": 9.99 }. Include a line's existing id to update it, omit id to add a new line.", "items": { "type": "object" } }
+                },
+                "required": ["invoice_id", "lines"]
             }
         }),
         json!({
             "name": "update_sales_order_lines",
-            "description": "Bulk-update sales order line items. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Set/replace line items on a sales order. Confirmed against the live sandbox: lines are set inline on the sales order record itself (posted as { id, lines } to /api/SalesOrder), not via a separate line-item endpoint — the previously assumed dedicated endpoint returned 404.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "lines": { "type": "array", "description": "Line objects, each including its id and the fields to change", "items": { "type": "object" } } },
-                "required": ["lines"]
+                "properties": {
+                    "sales_order_id": { "type": "integer", "description": "The sales order ID" },
+                    "lines": { "type": "array", "description": "Line objects, e.g. { \"item_id\": 7670, \"quantity\": 1, \"price\": 9.99 }. Include a line's existing id to update it, omit id to add a new line.", "items": { "type": "object" } }
+                },
+                "required": ["sales_order_id", "lines"]
             }
         }),
         json!({
@@ -3125,14 +3131,16 @@ async fn exec_delete_invoice_status(args: &Value, client: &HaloPSAClient) -> Res
 }
 
 async fn exec_update_invoice_lines(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let invoice_id = args.get("invoice_id").and_then(|v| v.as_i64()).ok_or("invoice_id is required")?;
     let lines = args.get("lines").cloned().ok_or("lines is required")?;
-    let result = client.update_invoice_lines(lines).await?;
+    let result = client.update_invoice_lines(invoice_id, lines).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 
 async fn exec_update_sales_order_lines(args: &Value, client: &HaloPSAClient) -> Result<String, String> {
+    let sales_order_id = args.get("sales_order_id").and_then(|v| v.as_i64()).ok_or("sales_order_id is required")?;
     let lines = args.get("lines").cloned().ok_or("lines is required")?;
-    let result = client.update_sales_order_lines(lines).await?;
+    let result = client.update_sales_order_lines(sales_order_id, lines).await?;
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
 

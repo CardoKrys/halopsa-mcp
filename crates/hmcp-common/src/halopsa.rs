@@ -1199,12 +1199,18 @@ impl HaloPSAClient {
         self.delete(&format!("/api/InvoiceStatus/{status_id}"), &[]).await
     }
 
-    pub async fn update_invoice_lines(&self, lines: Value) -> Result<Value, String> {
-        self.post("/api/InvoiceLine", &lines).await
+    // Lines are set inline on the parent record, not via a dedicated line
+    // endpoint — confirmed by update_quotation_lines' working {"id", "lines"}
+    // -> /api/Quotation pattern. The previously guessed /api/InvoiceLine and
+    // /api/SalesOrderLine endpoints don't exist (404).
+    pub async fn update_invoice_lines(&self, invoice_id: i64, lines: Value) -> Result<Value, String> {
+        let body = json!({ "id": invoice_id, "lines": lines });
+        self.post("/api/Invoice", &json!([body])).await
     }
 
-    pub async fn update_sales_order_lines(&self, lines: Value) -> Result<Value, String> {
-        self.post("/api/SalesOrderLine", &lines).await
+    pub async fn update_sales_order_lines(&self, sales_order_id: i64, lines: Value) -> Result<Value, String> {
+        let body = json!({ "id": sales_order_id, "lines": lines });
+        self.post("/api/SalesOrder", &json!([body])).await
     }
 
     pub async fn register_invoice_view(&self, invoice_id: i64) -> Result<Value, String> {
