@@ -407,10 +407,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_invoice",
-            "description": "Create a new invoice. Reuses the same confirmed /api/Invoice base path as list_invoices/get_invoice.",
+            "description": "Create a new invoice. Reuses the same confirmed /api/Invoice base path as list_invoices/get_invoice. Confirmed against the live sandbox: invoice_date is required or HaloPSA rejects with 400 'Date Invoiced is mandatory'.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "Invoice fields, e.g. { \"client_id\": 1, \"lines\": [...] }" } },
+                "properties": { "fields": { "type": "object", "description": "Invoice fields, e.g. { \"client_id\": 1, \"invoice_date\": \"2026-07-07T00:00:00Z\", \"lines\": [...] }. invoice_date is required." } },
                 "required": ["fields"]
             }
         }),
@@ -1316,10 +1316,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_quotation",
-            "description": "Create a new quotation. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create a new quotation. Confirmed against the live sandbox: user_id (a valid contact on the client, from list_users) is required or HaloPSA rejects with 400 'Please select a valid User'.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "Quotation fields, e.g. { \"client_id\": 1, \"title\": \"Office Refresh\" }" } },
+                "properties": { "fields": { "type": "object", "description": "Quotation fields, e.g. { \"client_id\": 1, \"title\": \"Office Refresh\", \"user_id\": 42 }. user_id is required." } },
                 "required": ["fields"]
             }
         }),
