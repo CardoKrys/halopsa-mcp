@@ -451,7 +451,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_supplier_user",
-            "description": "Create a new supplier-side contact attached to a supplier. Payload shape informed by a third-party connector's documented behavior (suppliers are Users under the hood) — not confirmed against this sandbox.",
+            "description": "Create a new supplier-side contact attached to a supplier. Confirmed against the live sandbox: emailaddress is required or HaloPSA rejects with 400 'Email Address is mandatory'.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -1381,10 +1381,10 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "create_timesheet",
-            "description": "Create a new timesheet entry. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Create/update a daily workday timesheet record for an agent (their scheduled vs. worked hours for one calendar day) — NOT a per-ticket time entry; use log_time for that. Confirmed against the live sandbox: the previously assumed shape ({agent_id, hours, ticket_id}) causes a 500 Internal Server Error. The real shape mirrors list_timesheets' rows: { agent_id, date, workdayid, work_hours }.",
             "inputSchema": {
                 "type": "object",
-                "properties": { "fields": { "type": "object", "description": "e.g. { \"agent_id\": 5, \"hours\": 1.5, \"ticket_id\": 1234 }" } },
+                "properties": { "fields": { "type": "object", "description": "e.g. { \"agent_id\": 5, \"date\": \"2026-07-07T00:00:00Z\", \"workdayid\": 1, \"work_hours\": 1.5 }" } },
                 "required": ["fields"]
             }
         }),
