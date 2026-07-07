@@ -831,7 +831,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "register_invoice_view",
-            "description": "Record that a user has viewed an invoice. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Confirmed BROKEN against the live sandbox: /api/InvoiceView returns 404 Not Found. No real endpoint found yet for this — treat calls as non-functional until re-investigated.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "invoice_id": { "type": "integer", "description": "The invoice ID" } },
@@ -840,7 +840,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "register_sales_order_view",
-            "description": "Record that a user has viewed a sales order. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Confirmed BROKEN against the live sandbox: /api/SalesOrderView returns 404 Not Found. No real endpoint found yet for this — treat calls as non-functional until re-investigated.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "sales_order_id": { "type": "integer", "description": "The sales order ID" } },
@@ -849,7 +849,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "register_purchase_order_view",
-            "description": "Record that a user has viewed a purchase order. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Likely BROKEN: the equivalent invoice/sales-order/KB-article view-tracking endpoints all confirmed 404 Not Found against the live sandbox (not independently tested for purchase orders, but same guessed-endpoint pattern) — treat calls as non-functional until re-investigated.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "purchase_order_id": { "type": "integer", "description": "The purchase order ID" } },
@@ -858,7 +858,7 @@ pub fn tool_definitions() -> Vec<Value> {
         }),
         json!({
             "name": "register_kb_article_view",
-            "description": "Record that a user has viewed a knowledge base article. Endpoint unconfirmed against this sandbox — flag results as unverified.",
+            "description": "Confirmed BROKEN against the live sandbox: /api/KBArticleView returns 404 Not Found. No real endpoint found yet for this — treat calls as non-functional until re-investigated.",
             "inputSchema": {
                 "type": "object",
                 "properties": { "kb_article_id": { "type": "integer", "description": "The KB article ID" } },
