@@ -4054,6 +4054,7 @@ async fn exec_get_agent(args: &Value, client: &HaloPSAClient) -> Result<String, 
     if let Some(obj) = result.as_object_mut() {
         obj.remove("access_control");
         obj.remove("claims");
+        obj.remove("languagepack");
     }
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
@@ -4161,13 +4162,16 @@ async fn exec_run_report(args: &Value, client: &HaloPSAClient) -> Result<String,
 async fn exec_get_me(client: &HaloPSAClient) -> Result<String, String> {
     let mut result = client.get_me().await?;
     // Full admin agents carry thousands of ACL rows and permission claims
-    // here (observed: 2.8MB / ~97k lines for a global-admin sandbox agent),
-    // which blows past MCP client output limits. Neither field is used by
-    // identity-resolution callers (only id/agentid/name/email are), so drop
-    // them from the tool-facing response.
+    // here (observed: 2.8MB / ~97k lines for a global-admin sandbox agent).
+    // Even after stripping those, `languagepack` alone (a full terminology
+    // translation dictionary + base64 flag icon) accounted for ~2.8MB on
+    // its own — confirmed live post-deploy. None of these are used by
+    // identity-resolution callers (only id/agentid/name/email are), so
+    // drop them from the tool-facing response.
     if let Some(obj) = result.as_object_mut() {
         obj.remove("access_control");
         obj.remove("claims");
+        obj.remove("languagepack");
     }
     Ok(serde_json::to_string_pretty(&result).unwrap())
 }
